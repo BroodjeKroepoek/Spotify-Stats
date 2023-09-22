@@ -8,6 +8,20 @@ Go to the website <https://www.spotify.com/us/account/privacy/> and click on "Re
 
 ## Quick Start
 
-```console
+*First time running*: supply the '--data \<DATA\>' argument. This will print everything to stdout.
+
+```ps
+cargo run -r -- --data .\data\
+```
+
+After that try searching via '--artist \<ARTIST\>' or '--track \<TRACK\>'.
+
+```ps
+cargo run -r -- --artist "Lizzo"
+```
+
+See help or the long help, by using '-h' or '--help' respectively.
+
+```ps
 cargo run -r -- --help
 ```
