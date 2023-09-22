@@ -261,7 +261,7 @@ struct MyCLI {
     /// The folder to extract the data from
     ///
     /// After one time running this executable it will create a summarized file, that contains everything from this folder!
-    /// So after one run it is no longer necessary to supply this argument.
+    /// So after one run it is no longer necessary to supply this argument, because it won't do anything if the summarized file is detected.
     #[arg(short, long)]
     data: Option<PathBuf>,
 }
