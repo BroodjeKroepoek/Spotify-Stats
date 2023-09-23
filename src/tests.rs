@@ -1,6 +1,6 @@
-use std::error::Error;
+use std::{error::Error, fs};
 
-use crate::model::{raw_streaming_data::RawStreamingData, streaming_data::StreamingData};
+use crate::model::{raw_streaming_data::RawStreamingData, streaming_data::StreamingData, Persist};
 
 #[test]
 fn test_isomorphism_raw_internal_streaming_history() -> Result<(), Box<dyn Error>> {
@@ -44,5 +44,16 @@ fn test_isomorphism_external_streaming_history() -> Result<(), Box<dyn Error>> {
         initial_json_cleaned_representation,
         secondary_json_cleaned_representation
     );
+    Ok(())
+}
+
+#[test]
+fn test_persist_streaming_data() -> Result<(), Box<dyn Error>> {
+    let initial_entries = RawStreamingData::from_path("data")?;
+    let initial_cleaned = StreamingData::from(initial_entries);
+    initial_cleaned.save("test.json")?;
+    let secondary_cleaned = StreamingData::load("test.json")?;
+    assert_eq!(initial_cleaned, secondary_cleaned);
+    fs::remove_file("test.json")?;
     Ok(())
 }
