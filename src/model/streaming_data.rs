@@ -84,14 +84,16 @@ impl From<RawStreamingData> for StreamingData {
 }
 
 impl Persist for StreamingData {
-    fn save<P>(&self, key: P) -> Result<(), std::io::Error>
+    type Error = std::io::Error;
+
+    fn save<P>(&self, key: P) -> Result<(), Self::Error>
     where
         P: AsRef<Path>,
     {
         Ok(fs::write(key, serde_json::to_string(&self)?)?)
     }
 
-    fn load<P>(key: P) -> Result<Self, std::io::Error>
+    fn load<P>(key: P) -> Result<Self, Self::Error>
     where
         Self: Sized,
         P: AsRef<Path>,

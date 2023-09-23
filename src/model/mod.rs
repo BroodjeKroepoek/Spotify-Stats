@@ -3,12 +3,14 @@ use std::path::Path;
 pub mod raw_streaming_data;
 pub mod streaming_data;
 
-trait Persist {
-    fn save<P>(&self, key: P) -> Result<(), std::io::Error>
+pub trait Persist {
+    type Error;
+
+    fn save<P>(&self, key: P) -> Result<(), Self::Error>
     where
         P: AsRef<Path>;
 
-    fn load<P>(key: P) -> Result<Self, std::io::Error>
+    fn load<P>(key: P) -> Result<Self, Self::Error>
     where
         Self: Sized,
         P: AsRef<Path>;

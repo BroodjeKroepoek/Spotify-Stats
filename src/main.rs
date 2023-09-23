@@ -3,17 +3,12 @@ pub mod serde;
 #[cfg(test)]
 pub mod tests;
 
-use std::{
-    collections::BTreeMap,
-    error::Error,
-    fs::{self, read_to_string},
-    path::PathBuf,
-};
+use std::{collections::BTreeMap, error::Error, path::PathBuf};
 
 use clap::{Parser, ValueEnum};
 use comfy_table::{presets::ASCII_MARKDOWN, Table};
 
-use crate::model::{raw_streaming_data::RawStreamingData, streaming_data::StreamingData};
+use crate::model::{raw_streaming_data::RawStreamingData, streaming_data::StreamingData, Persist};
 
 #[derive(Debug, Clone, ValueEnum, Default)]
 enum Format {
@@ -69,21 +64,20 @@ struct MyCLI {
     data: Option<PathBuf>,
 }
 
-const JSON_DATA: &str = "spotify-stats.json";
+const JSON_DATA_PATH: &str = "spotify-stats.json";
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args = MyCLI::parse();
-    let streaming_history: StreamingData = match read_to_string(JSON_DATA) {
-        Ok(string) => serde_json::from_str(&string)?,
+    let streaming_data: StreamingData = match StreamingData::load(JSON_DATA_PATH) {
+        Ok(streaming_data) => streaming_data,
         Err(_) => match args.data {
             Some(path) => {
-                eprintln!("[INFO] `{}` didn't exist yet, creating...", JSON_DATA);
-                let raw_streaming_history: RawStreamingData = RawStreamingData::from_path(&path)?;
-                let streaming_history = StreamingData::from(raw_streaming_history);
-                let json = serde_json::to_string(&streaming_history)?;
-                fs::write(JSON_DATA, json)?;
+                eprintln!("[INFO] `{}` didn't exist yet, creating...", JSON_DATA_PATH);
+                let raw_streaming_data: RawStreamingData = RawStreamingData::from_path(&path)?;
+                let streaming_data = StreamingData::from(raw_streaming_data);
+                streaming_data.save(JSON_DATA_PATH)?;
                 eprintln!("[INFO] Finished creating `combined.json`");
-                streaming_history
+                streaming_data
             }
             None => {
                 panic!("the '--data <DATA>' argument was not provided, this is needed the first time only")
@@ -93,10 +87,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     match args.format {
         Format::Json => {
             let json = match (args.artist, args.track) {
-                (None, None) => serde_json::to_string_pretty(&streaming_history)?,
+                (None, None) => serde_json::to_string_pretty(&streaming_data)?,
                 (None, Some(args_track)) => {
                     let mut accumulator: StreamingData = StreamingData(BTreeMap::new());
-                    for (artist, rest) in streaming_history.0 {
+                    for (artist, rest) in streaming_data.0 {
                         for (track, time) in rest {
                             if track == args_track {
                                 let mut new = BTreeMap::new();
@@ -108,10 +102,10 @@ fn main() -> Result<(), Box<dyn Error>> {
                     serde_json::to_string_pretty(&accumulator)?
                 }
                 (Some(args_artist), None) => {
-                    serde_json::to_string_pretty(&streaming_history.0[&args_artist])?
+                    serde_json::to_string_pretty(&streaming_data.0[&args_artist])?
                 }
                 (Some(args_artist), Some(args_track)) => {
-                    serde_json::to_string_pretty(&streaming_history.0[&args_artist][&args_track])?
+                    serde_json::to_string_pretty(&streaming_data.0[&args_artist][&args_track])?
                 }
             };
             println!("{}", json);
@@ -120,7 +114,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             let mut table = Table::new();
             table.load_preset(ASCII_MARKDOWN);
             table.set_header(["Artist", "Track", "Time Played (ms)"]);
-            for (artist, rest) in &streaming_history.0 {
+            for (artist, rest) in &streaming_data.0 {
                 for (track, time) in rest {
                     if (Some(artist) == args.artist.as_ref() || Some(track) == args.track.as_ref())
                         ^ (args.artist.is_none() && args.track.is_none())
