@@ -37,3 +37,5 @@ spotify-stats --help
   - [ ] This will need some sort of persistent storage and credentials.
 - [ ] *ms* listened to, is not very easy to read.
 - [ ] Can API calls also supply us with streaming data?
+- [ ] Add case insensitivity to searching, and maybe Levenshtein distance, so making small spelling errors is allowed.
+- [ ] Add benchmarks for persistence?

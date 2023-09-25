@@ -1,13 +1,17 @@
+// Module definitions
 pub mod model;
 pub mod serde;
 #[cfg(test)]
 pub mod tests;
 
+// Std imports
 use std::{collections::BTreeMap, error::Error, path::PathBuf};
 
+// Dependency imports
 use clap::{Parser, ValueEnum};
 use comfy_table::{presets::ASCII_MARKDOWN, Table};
 
+// Modular imports
 use crate::model::{raw_streaming_data::RawStreamingData, streaming_data::StreamingData, Persist};
 
 #[derive(Debug, Clone, ValueEnum, Default)]

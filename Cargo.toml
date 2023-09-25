@@ -13,3 +13,10 @@ clap = { version = "4.4.4", features = ["derive"] }
 comfy-table = "7.0.1"
 serde = { version = "1.0.188", features = ["derive"] }
 serde_json = { version = "1.0.107", features = ["preserve_order"] }
+
+[dev-dependencies]
+criterion = "0.5.1"
+
+[[bench]]
+name = "benchmark"
+harness = false
