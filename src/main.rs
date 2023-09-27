@@ -78,13 +78,16 @@ enum OutputRuntime {
 #[clap(version, author)]
 struct MyCLI {
     /// The name of the artist to search for
-    #[arg(short, long)]
+    #[arg(long)]
     artist: Option<String>,
+    /// The name of the album to search for
+    #[arg(long)]
+    album: Option<String>,
     /// The name of the track to search for
-    #[arg(short, long)]
+    #[arg(long)]
     track: Option<String>,
-    // The name of the platform to search for
-    #[arg(short, long)]
+    /// The name of the platform to search for
+    #[arg(long)]
     platform: Option<String>,
     /// The formatting to use when printing the results to stdout
     #[arg(short, long, value_enum, default_value_t)]
@@ -129,14 +132,15 @@ fn main() -> Result<(), Box<dyn Error>> {
                 (None, None) => serde_json::to_string_pretty(&streaming_data)?,
                 (None, Some(args_track)) => {
                     let mut accumulator = FoldedStreamingData(BTreeMap::new());
-                    iterate_nested_map!(streaming_data, artist, track, platform, time, {
-                        if track == args_track {
+                    iterate_nested_map!(streaming_data, artist, album, track, platform, time, {
+                        if track == &args_track {
                             insert_nested_map!(
                                 accumulator,
                                 artist.clone(),
+                                album.clone(),
                                 track.clone(),
-                                platform,
-                                time
+                                platform.clone(),
+                                time.clone()
                             )
                         }
                     });
@@ -157,15 +161,17 @@ fn main() -> Result<(), Box<dyn Error>> {
         Format::Table => {
             let mut table = Table::new();
             table.load_preset(ASCII_MARKDOWN);
-            table.set_header(["Artist", "Track", "Platform", "Time Played (ms)"]);
-            iterate_nested_map!(streaming_data, artist, track, platform, time, {
-                if (Some(&artist) == args.artist.as_ref()
-                    || Some(&track) == args.track.as_ref()
-                    || Some(&platform) == args.platform.as_ref())
+            table.set_header(["Artist", "Album", "Track", "Platform", "Time Played (ms)"]);
+            iterate_nested_map!(streaming_data, artist, album, track, platform, time, {
+                if (Some(artist) == args.artist.as_ref()
+                    || Some(album) == args.album.as_ref()
+                    || Some(track) == args.track.as_ref()
+                    || Some(platform) == args.platform.as_ref())
                     ^ (args.artist.is_none() && args.track.is_none() && args.platform.is_none())
                 {
                     table.add_row([
                         &artist,
+                        &album,
                         &track,
                         &platform,
                         &time.ms_played.num_milliseconds().to_string(),
@@ -187,12 +193,14 @@ fn main() -> Result<(), Box<dyn Error>> {
             table.set_header(["Artist", "Track", "Platform", "Time Played (ms)"]);
             for cleaned_entry in cleaned_entries.0 {
                 if (Some(&cleaned_entry.artist) == args.artist.as_ref()
+                    || Some(&cleaned_entry.artist) == args.album.as_ref()
                     || Some(&cleaned_entry.track) == args.track.as_ref()
                     || Some(&cleaned_entry.platform) == args.platform.as_ref())
                     ^ (args.artist.is_none() && args.track.is_none() && args.platform.is_none())
                 {
                     table.add_row([
                         &cleaned_entry.artist,
+                        &cleaned_entry.album,
                         &cleaned_entry.track,
                         &cleaned_entry.platform,
                         &cleaned_entry.ms_played.num_milliseconds().to_string(),

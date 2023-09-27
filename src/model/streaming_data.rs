@@ -27,30 +27,35 @@ pub struct TimeIdent {
     pub ms_played: Duration,
 }
 
-/// <ARTIST> : { <TRACK> : { <PLATFORM> : { ms_played: ..., end_times: [ ... ] } } }
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
-pub struct FoldedStreamingData(pub BTreeMap<String, BTreeMap<String, BTreeMap<String, TimeIdent>>>);
+pub struct FoldedStreamingData(
+    //           Artist           Album            Track            Platform, TimeIdent
+    pub BTreeMap<String, BTreeMap<String, BTreeMap<String, BTreeMap<String, TimeIdent>>>>,
+);
 
 #[macro_export]
 macro_rules! insert_nested_map {
-    ($map:expr, $k1:expr, $k2:expr, $k3:expr, $v:expr) => {{
+    ($map:expr, $k1:expr, $k2:expr, $k3:expr, $k4:expr, $v:expr) => {{
         $map.0
             .entry($k1)
-            .or_insert_with(|| BTreeMap::new())
+            .or_insert(BTreeMap::new())
             .entry($k2)
-            .or_insert_with(|| BTreeMap::new())
+            .or_insert(BTreeMap::new())
             .entry($k3)
-            .or_insert_with(|| $v);
+            .or_insert(BTreeMap::new())
+            .entry($k4)
+            .or_insert($v);
     }};
 }
 
 #[macro_export]
 macro_rules! iterate_nested_map {
-    ($map:expr, $key1:ident, $key2:ident, $key3:ident, $val:ident, $body:block) => {
-        for ($key1, inner_map) in $map.0 {
-            for ($key2, nested_map) in inner_map {
-                for ($key3, $val) in nested_map {
-                    $body
+    ($map:expr, $key1:ident, $key2:ident, $key3:ident, $key4:ident, $val:ident, $body:block) => {
+        for ($key1, inner_map1) in &$map.0 {
+            for ($key2, inner_map2) in inner_map1 {
+                for ($key3, inner_map3) in inner_map2 {
+                    for ($key4, $val) in inner_map3
+                        $body
                 }
             }
         }
@@ -74,28 +79,57 @@ impl AddAssign for TimeIdent {
 }
 
 /// Everthing as `SpotifyEntry`, but combining all the stats on a per-track basis
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CleanedSpotifyEntry {
     pub artist: String,
+    pub album: String,
     pub track: String,
     pub platform: String,
+    #[serde(
+        deserialize_with = "duration_deserialization",
+        serialize_with = "duration_serialization"
+    )]
     pub ms_played: Duration,
+    #[serde(
+        deserialize_with = "vec_of_naive_date_time_deserialization",
+        serialize_with = "vec_of_naive_date_time_serialization"
+    )]
     pub end_times: Vec<NaiveDateTime>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CleanedStreamingData(pub Vec<CleanedSpotifyEntry>);
+
+impl Persist for CleanedStreamingData {
+    type Error = std::io::Error;
+
+    fn save<P>(&self, key: P) -> Result<(), Self::Error>
+    where
+        P: AsRef<Path>,
+    {
+        Ok(fs::write(key, serde_json::to_string(&self)?)?)
+    }
+
+    fn load<P>(key: P) -> Result<Self, Self::Error>
+    where
+        Self: Sized,
+        P: AsRef<Path>,
+    {
+        Ok(serde_json::from_str(&fs::read_to_string(key)?)?)
+    }
+}
 
 impl From<FoldedStreamingData> for CleanedStreamingData {
     fn from(value: FoldedStreamingData) -> Self {
         let mut accumulator = Vec::new();
-        iterate_nested_map!(value, artist, track, platform, time, {
+        iterate_nested_map!(value, artist, album, track, platform, time, {
             accumulator.push(CleanedSpotifyEntry {
                 artist: artist.clone(),
+                album: album.clone(),
                 track: track.clone(),
-                platform,
+                platform: platform.clone(),
                 ms_played: time.ms_played,
-                end_times: time.end_times,
+                end_times: time.end_times.clone(),
             });
         });
         CleanedStreamingData(accumulator)
@@ -109,16 +143,20 @@ impl From<RawStreamingData> for FoldedStreamingData {
             let time_ident = TimeIdent::from(&thing);
             let artist_name = thing.master_metadata_album_artist_name;
             let track_name = thing.master_metadata_track_name;
+            let album = thing.master_metadata_album_album_name;
             let platform = thing.platform;
             if let Some(artist_name) = artist_name {
                 if let Some(track_name) = track_name {
-                    insert_nested_map!(
-                        &mut accumulator,
-                        artist_name,
-                        track_name,
-                        platform,
-                        time_ident
-                    );
+                    if let Some(album) = album {
+                        insert_nested_map!(
+                            &mut accumulator,
+                            artist_name,
+                            album,
+                            track_name,
+                            platform,
+                            time_ident
+                        );
+                    }
                 }
             };
         }
