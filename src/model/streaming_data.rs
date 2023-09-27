@@ -1,12 +1,4 @@
-use std::{
-    collections::{
-        btree_map::{Entry, IntoIter},
-        BTreeMap,
-    },
-    fs,
-    ops::AddAssign,
-    path::Path,
-};
+use std::{collections::BTreeMap, fs, ops::AddAssign, path::Path};
 
 use chrono::{Duration, NaiveDateTime};
 use serde::{Deserialize, Serialize};
@@ -35,8 +27,35 @@ pub struct TimeIdent {
     pub ms_played: Duration,
 }
 
+/// <ARTIST> : { <TRACK> : { <PLATFORM> : { ms_played: ..., end_times: [ ... ] } } }
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
-pub struct StreamingData(pub BTreeMap<String, BTreeMap<String, TimeIdent>>);
+pub struct FoldedStreamingData(pub BTreeMap<String, BTreeMap<String, BTreeMap<String, TimeIdent>>>);
+
+#[macro_export]
+macro_rules! insert_nested_map {
+    ($map:expr, $k1:expr, $k2:expr, $k3:expr, $v:expr) => {{
+        $map.0
+            .entry($k1)
+            .or_insert_with(|| BTreeMap::new())
+            .entry($k2)
+            .or_insert_with(|| BTreeMap::new())
+            .entry($k3)
+            .or_insert_with(|| $v);
+    }};
+}
+
+#[macro_export]
+macro_rules! iterate_nested_map {
+    ($map:expr, $key1:ident, $key2:ident, $key3:ident, $val:ident, $body:block) => {
+        for ($key1, inner_map) in $map.0 {
+            for ($key2, nested_map) in inner_map {
+                for ($key3, $val) in nested_map {
+                    $body
+                }
+            }
+        }
+    };
+}
 
 impl From<&SpotifyEntry> for TimeIdent {
     fn from(value: &SpotifyEntry) -> Self {
@@ -54,10 +73,12 @@ impl AddAssign for TimeIdent {
     }
 }
 
+/// Everthing as `SpotifyEntry`, but combining all the stats on a per-track basis
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CleanedSpotifyEntry {
     pub artist: String,
     pub track: String,
+    pub platform: String,
     pub ms_played: Duration,
     pub end_times: Vec<NaiveDateTime>,
 }
@@ -65,51 +86,39 @@ pub struct CleanedSpotifyEntry {
 #[derive(Debug)]
 pub struct CleanedStreamingData(pub Vec<CleanedSpotifyEntry>);
 
-impl From<StreamingData> for CleanedStreamingData {
-    fn from(value: StreamingData) -> Self {
+impl From<FoldedStreamingData> for CleanedStreamingData {
+    fn from(value: FoldedStreamingData) -> Self {
         let mut accumulator = Vec::new();
-        for (artist, rest) in value.0 {
-            for (track, time) in rest {
-                accumulator.push(CleanedSpotifyEntry {
-                    artist: artist.clone(),
-                    track,
-                    ms_played: time.ms_played,
-                    end_times: time.end_times,
-                })
-            }
-        }
+        iterate_nested_map!(value, artist, track, platform, time, {
+            accumulator.push(CleanedSpotifyEntry {
+                artist: artist.clone(),
+                track: track.clone(),
+                platform,
+                ms_played: time.ms_played,
+                end_times: time.end_times,
+            });
+        });
         CleanedStreamingData(accumulator)
     }
 }
 
-impl From<RawStreamingData> for StreamingData {
+impl From<RawStreamingData> for FoldedStreamingData {
     fn from(value: RawStreamingData) -> Self {
-        let mut accumulator = StreamingData(BTreeMap::new());
+        let mut accumulator = FoldedStreamingData(BTreeMap::new());
         for thing in value.0.into_iter() {
             let time_ident = TimeIdent::from(&thing);
             let artist_name = thing.master_metadata_album_artist_name;
             let track_name = thing.master_metadata_track_name;
+            let platform = thing.platform;
             if let Some(artist_name) = artist_name {
                 if let Some(track_name) = track_name {
-                    match accumulator.0.entry(artist_name) {
-                        Entry::Vacant(vacant_entry) => {
-                            let mut new = BTreeMap::new();
-                            new.insert(track_name, time_ident);
-                            vacant_entry.insert(new);
-                        }
-                        Entry::Occupied(mut occupied_entry) => {
-                            let mutable = occupied_entry.get_mut();
-                            match mutable.entry(track_name) {
-                                Entry::Vacant(vacant_entry) => {
-                                    vacant_entry.insert(time_ident);
-                                }
-                                Entry::Occupied(mut occupied_entry) => {
-                                    let mutable = occupied_entry.get_mut();
-                                    *mutable += time_ident;
-                                }
-                            }
-                        }
-                    }
+                    insert_nested_map!(
+                        &mut accumulator,
+                        artist_name,
+                        track_name,
+                        platform,
+                        time_ident
+                    );
                 }
             };
         }
@@ -117,7 +126,7 @@ impl From<RawStreamingData> for StreamingData {
     }
 }
 
-impl Persist for StreamingData {
+impl Persist for FoldedStreamingData {
     type Error = std::io::Error;
 
     fn save<P>(&self, key: P) -> Result<(), Self::Error>

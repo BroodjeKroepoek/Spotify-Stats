@@ -10,7 +10,7 @@ where
     let s: Vec<String> = Deserialize::deserialize(deserializer)?;
     let s = s
         .into_iter()
-        .map(|x| NaiveDateTime::parse_from_str(&x, "%Y-%m-%d %H:%M").unwrap())
+        .map(|x| NaiveDateTime::parse_from_str(&x, "%Y-%m-%dT%H:%M:%SZ").unwrap())
         .collect();
     Ok(s)
 }

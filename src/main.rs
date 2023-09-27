@@ -5,7 +5,15 @@ pub mod serde;
 pub mod tests;
 
 // Std imports
-use std::{collections::BTreeMap, error::Error, fs, path::PathBuf};
+use std::{
+    collections::BTreeMap,
+    error::Error,
+    fs::File,
+    io::{stdout, Stdout},
+    path::PathBuf,
+};
+
+use std::io::Write;
 
 // Dependency imports
 use clap::{Parser, ValueEnum};
@@ -14,7 +22,7 @@ use comfy_table::{presets::ASCII_MARKDOWN, Table};
 // Modular imports
 use crate::model::{
     raw_streaming_data::RawStreamingData,
-    streaming_data::{CleanedSpotifyEntry, CleanedStreamingData, StreamingData},
+    streaming_data::{CleanedStreamingData, FoldedStreamingData},
     Persist,
 };
 
@@ -49,7 +57,20 @@ enum Format {
     /// ```
     #[default]
     Table,
+    /// `Table` formatting, but sorted, for now
     Sorted,
+}
+
+#[derive(Debug, Clone, ValueEnum, Default)]
+enum Output {
+    #[default]
+    Stdout,
+    File,
+}
+
+enum OutputRuntime {
+    Stdout(Stdout),
+    File(File),
 }
 
 /// Command Line Interface that can process your Spotify Streaming Data
@@ -71,21 +92,22 @@ struct MyCLI {
     /// So after one run it is no longer necessary to supply this argument, because it won't do anything if the summarized file is detected.
     #[arg(short, long)]
     data: Option<PathBuf>,
+    #[arg(short, long, value_enum, default_value_t)]
+    output: Output,
 }
 
 const JSON_DATA_PATH: &str = "spot_stats.json";
+const OUTPUT_PATH: &str = "spot_stats_output.txt";
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args = MyCLI::parse();
-    let streaming_data: StreamingData = match StreamingData::load(JSON_DATA_PATH) {
+    let streaming_data = match FoldedStreamingData::load(JSON_DATA_PATH) {
         Ok(streaming_data) => streaming_data,
         Err(_) => match args.data {
             Some(path) => {
-                eprintln!("[INFO] `{}` didn't exist yet, creating...", JSON_DATA_PATH);
                 let raw_streaming_data: RawStreamingData = RawStreamingData::from_path(&path)?;
-                let streaming_data = StreamingData::from(raw_streaming_data);
+                let streaming_data = FoldedStreamingData::from(raw_streaming_data);
                 streaming_data.save(JSON_DATA_PATH)?;
-                eprintln!("[INFO] Finished creating `{}`", JSON_DATA_PATH);
                 streaming_data
             }
             None => {
@@ -93,12 +115,16 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
         },
     };
+    let output_stream = match args.output {
+        Output::Stdout => OutputRuntime::Stdout(stdout()),
+        Output::File => OutputRuntime::File(File::create(OUTPUT_PATH).unwrap()),
+    };
     match args.format {
         Format::Json => {
             let json = match (args.artist, args.track) {
                 (None, None) => serde_json::to_string_pretty(&streaming_data)?,
                 (None, Some(args_track)) => {
-                    let mut accumulator: StreamingData = StreamingData(BTreeMap::new());
+                    let mut accumulator = FoldedStreamingData(BTreeMap::new());
                     for (artist, rest) in streaming_data.0 {
                         for (track, time) in rest {
                             if track == args_track {
@@ -117,26 +143,31 @@ fn main() -> Result<(), Box<dyn Error>> {
                     serde_json::to_string_pretty(&streaming_data.0[&args_artist][&args_track])?
                 }
             };
-            println!("{}", json);
+            match output_stream {
+                OutputRuntime::Stdout(mut x) => x.write_all(json.as_bytes())?,
+                OutputRuntime::File(mut x) => x.write_all(json.as_bytes())?,
+            };
         }
         Format::Table => {
             let mut table = Table::new();
             table.load_preset(ASCII_MARKDOWN);
-            table.set_header(["Artist", "Track", "Time Played (ms)"]);
-            for (artist, rest) in &streaming_data.0 {
-                for (track, time) in rest {
-                    if (Some(artist) == args.artist.as_ref() || Some(track) == args.track.as_ref())
-                        ^ (args.artist.is_none() && args.track.is_none())
-                    {
-                        table.add_row([
-                            artist,
-                            track,
-                            &time.ms_played.num_milliseconds().to_string(),
-                        ]);
-                    }
+            table.set_header(["Artist", "Track", "Platform", "Time Played (ms)"]);
+            iterate_nested_map!(streaming_data, artist, track, platform, time, {
+                if (Some(&artist) == args.artist.as_ref() || Some(&track) == args.track.as_ref())
+                    ^ (args.artist.is_none() && args.track.is_none())
+                {
+                    table.add_row([
+                        artist.clone(),
+                        track.clone(),
+                        platform,
+                        time.ms_played.num_milliseconds().to_string(),
+                    ]);
                 }
+            });
+            match output_stream {
+                OutputRuntime::Stdout(mut x) => x.write_all(table.to_string().as_bytes())?,
+                OutputRuntime::File(mut x) => x.write_all(table.to_string().as_bytes())?,
             }
-            println!("{}", table);
         }
         Format::Sorted => {
             let mut cleaned_entries = CleanedStreamingData::from(streaming_data);
@@ -145,20 +176,24 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .sort_by(|a, b| a.ms_played.cmp(&b.ms_played));
             let mut table = Table::new();
             table.load_preset(ASCII_MARKDOWN);
-            table.set_header(["Artist", "Track", "Time Played (ms)"]);
-            for cleaned_entry in &cleaned_entries.0 {
-                if (Some(cleaned_entry.artist.clone()) == args.artist
-                    || Some(cleaned_entry.track.clone()) == args.track)
+            table.set_header(["Artist", "Track", "Platform", "Time Played (ms)"]);
+            for cleaned_entry in cleaned_entries.0 {
+                if (Some(&cleaned_entry.artist) == args.artist.as_ref()
+                    || Some(&cleaned_entry.track) == args.track.as_ref())
                     ^ (args.artist.is_none() && args.track.is_none())
                 {
                     table.add_row([
                         &cleaned_entry.artist,
                         &cleaned_entry.track,
+                        &cleaned_entry.platform,
                         &cleaned_entry.ms_played.num_milliseconds().to_string(),
                     ]);
                 }
             }
-            println!("{}", table);
+            match output_stream {
+                OutputRuntime::Stdout(mut x) => x.write_all(table.to_string().as_bytes())?,
+                OutputRuntime::File(mut x) => x.write_all(table.to_string().as_bytes())?,
+            }
         }
     }
     Ok(())

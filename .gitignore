@@ -1,5 +1,7 @@
 /target
 /data
 /full_data
+/test_full_data
 spot_stats.json
+spot_stats_output.txt
 .vscode

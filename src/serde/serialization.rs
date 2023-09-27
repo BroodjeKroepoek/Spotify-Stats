@@ -10,7 +10,7 @@ where
 {
     let s: Vec<String> = naive_date_times
         .iter()
-        .map(|x| x.format("%Y-%m-%d %H:%M").to_string())
+        .map(|x| x.format("%Y-%m-%dT%H:%M:%SZ").to_string())
         .collect();
     Serialize::serialize(&s, serializer)
 }
@@ -22,6 +22,7 @@ where
     Serialize::serialize(&duration.num_milliseconds(), serializer)
 }
 
+// "2023-02-22T07:01:41Z"
 pub fn naive_date_time_serialization<S>(
     naive_date_time: &NaiveDateTime,
     serializer: S,
@@ -30,7 +31,7 @@ where
     S: Serializer,
 {
     Serialize::serialize(
-        &naive_date_time.format("%Y-%m-%d %H:%M").to_string(),
+        &naive_date_time.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
         serializer,
     )
 }
