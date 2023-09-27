@@ -125,15 +125,17 @@ fn main() -> Result<(), Box<dyn Error>> {
                 (None, None) => serde_json::to_string_pretty(&streaming_data)?,
                 (None, Some(args_track)) => {
                     let mut accumulator = FoldedStreamingData(BTreeMap::new());
-                    for (artist, rest) in streaming_data.0 {
-                        for (track, time) in rest {
-                            if track == args_track {
-                                let mut new = BTreeMap::new();
-                                new.insert(track, time);
-                                accumulator.0.insert(artist.clone(), new);
-                            }
+                    iterate_nested_map!(streaming_data, artist, track, platform, time, {
+                        if track == args_track {
+                            insert_nested_map!(
+                                accumulator,
+                                artist.clone(),
+                                track.clone(),
+                                platform,
+                                time
+                            )
                         }
-                    }
+                    });
                     serde_json::to_string_pretty(&accumulator)?
                 }
                 (Some(args_artist), None) => {
@@ -157,10 +159,10 @@ fn main() -> Result<(), Box<dyn Error>> {
                     ^ (args.artist.is_none() && args.track.is_none())
                 {
                     table.add_row([
-                        artist.clone(),
-                        track.clone(),
-                        platform,
-                        time.ms_played.num_milliseconds().to_string(),
+                        &artist,
+                        &track,
+                        &platform,
+                        &time.ms_played.num_milliseconds().to_string(),
                     ]);
                 }
             });
