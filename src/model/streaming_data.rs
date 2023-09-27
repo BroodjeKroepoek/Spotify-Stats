@@ -1,5 +1,8 @@
 use std::{
-    collections::{btree_map, BTreeMap},
+    collections::{
+        btree_map::{Entry, IntoIter},
+        BTreeMap,
+    },
     fs,
     ops::AddAssign,
     path::Path,
@@ -14,7 +17,7 @@ use crate::serde::{
 };
 
 use super::{
-    raw_streaming_data::{Entry, RawStreamingData},
+    raw_streaming_data::{RawStreamingData, SpotifyEntry},
     Persist,
 };
 
@@ -35,10 +38,10 @@ pub struct TimeIdent {
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
 pub struct StreamingData(pub BTreeMap<String, BTreeMap<String, TimeIdent>>);
 
-impl From<&Entry> for TimeIdent {
-    fn from(value: &Entry) -> Self {
+impl From<&SpotifyEntry> for TimeIdent {
+    fn from(value: &SpotifyEntry) -> Self {
         Self {
-            end_times: vec![value.end_time],
+            end_times: vec![value.ts],
             ms_played: value.ms_played,
         }
     }
@@ -51,29 +54,60 @@ impl AddAssign for TimeIdent {
     }
 }
 
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct CleanedSpotifyEntry {
+    pub artist: String,
+    pub track: String,
+    pub ms_played: Duration,
+    pub end_times: Vec<NaiveDateTime>,
+}
+
+#[derive(Debug)]
+pub struct CleanedStreamingData(pub Vec<CleanedSpotifyEntry>);
+
+impl From<StreamingData> for CleanedStreamingData {
+    fn from(value: StreamingData) -> Self {
+        let mut accumulator = Vec::new();
+        for (artist, rest) in value.0 {
+            for (track, time) in rest {
+                accumulator.push(CleanedSpotifyEntry {
+                    artist: artist.clone(),
+                    track,
+                    ms_played: time.ms_played,
+                    end_times: time.end_times,
+                })
+            }
+        }
+        CleanedStreamingData(accumulator)
+    }
+}
+
 impl From<RawStreamingData> for StreamingData {
     fn from(value: RawStreamingData) -> Self {
         let mut accumulator = StreamingData(BTreeMap::new());
         for thing in value.0.into_iter() {
             let time_ident = TimeIdent::from(&thing);
-            let artist_name = thing.artist_name;
-            let track_name = thing.track_name;
-
-            match accumulator.0.entry(artist_name) {
-                btree_map::Entry::Vacant(vacant_entry) => {
-                    let mut new = BTreeMap::new();
-                    new.insert(track_name, time_ident);
-                    vacant_entry.insert(new);
-                }
-                btree_map::Entry::Occupied(mut occupied_entry) => {
-                    let mutable = occupied_entry.get_mut();
-                    match mutable.entry(track_name) {
-                        btree_map::Entry::Vacant(vacant_entry) => {
-                            vacant_entry.insert(time_ident);
+            let artist_name = thing.master_metadata_album_artist_name;
+            let track_name = thing.master_metadata_track_name;
+            if let Some(artist_name) = artist_name {
+                if let Some(track_name) = track_name {
+                    match accumulator.0.entry(artist_name) {
+                        Entry::Vacant(vacant_entry) => {
+                            let mut new = BTreeMap::new();
+                            new.insert(track_name, time_ident);
+                            vacant_entry.insert(new);
                         }
-                        btree_map::Entry::Occupied(mut occupied_entry) => {
+                        Entry::Occupied(mut occupied_entry) => {
                             let mutable = occupied_entry.get_mut();
-                            *mutable += time_ident;
+                            match mutable.entry(track_name) {
+                                Entry::Vacant(vacant_entry) => {
+                                    vacant_entry.insert(time_ident);
+                                }
+                                Entry::Occupied(mut occupied_entry) => {
+                                    let mutable = occupied_entry.get_mut();
+                                    *mutable += time_ident;
+                                }
+                            }
                         }
                     }
                 }

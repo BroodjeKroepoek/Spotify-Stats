@@ -5,14 +5,18 @@ pub mod serde;
 pub mod tests;
 
 // Std imports
-use std::{collections::BTreeMap, error::Error, path::PathBuf};
+use std::{collections::BTreeMap, error::Error, fs, path::PathBuf};
 
 // Dependency imports
 use clap::{Parser, ValueEnum};
 use comfy_table::{presets::ASCII_MARKDOWN, Table};
 
 // Modular imports
-use crate::model::{raw_streaming_data::RawStreamingData, streaming_data::StreamingData, Persist};
+use crate::model::{
+    raw_streaming_data::RawStreamingData,
+    streaming_data::{CleanedSpotifyEntry, CleanedStreamingData, StreamingData},
+    Persist,
+};
 
 #[derive(Debug, Clone, ValueEnum, Default)]
 enum Format {
@@ -45,6 +49,7 @@ enum Format {
     /// ```
     #[default]
     Table,
+    Sorted,
 }
 
 /// Command Line Interface that can process your Spotify Streaming Data
@@ -68,7 +73,7 @@ struct MyCLI {
     data: Option<PathBuf>,
 }
 
-const JSON_DATA_PATH: &str = "spotify-stats.json";
+const JSON_DATA_PATH: &str = "spot_stats.json";
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args = MyCLI::parse();
@@ -80,7 +85,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 let raw_streaming_data: RawStreamingData = RawStreamingData::from_path(&path)?;
                 let streaming_data = StreamingData::from(raw_streaming_data);
                 streaming_data.save(JSON_DATA_PATH)?;
-                eprintln!("[INFO] Finished creating `combined.json`");
+                eprintln!("[INFO] Finished creating `{}`", JSON_DATA_PATH);
                 streaming_data
             }
             None => {
@@ -129,6 +134,28 @@ fn main() -> Result<(), Box<dyn Error>> {
                             &time.ms_played.num_milliseconds().to_string(),
                         ]);
                     }
+                }
+            }
+            println!("{}", table);
+        }
+        Format::Sorted => {
+            let mut cleaned_entries = CleanedStreamingData::from(streaming_data);
+            cleaned_entries
+                .0
+                .sort_by(|a, b| a.ms_played.cmp(&b.ms_played));
+            let mut table = Table::new();
+            table.load_preset(ASCII_MARKDOWN);
+            table.set_header(["Artist", "Track", "Time Played (ms)"]);
+            for cleaned_entry in &cleaned_entries.0 {
+                if (Some(cleaned_entry.artist.clone()) == args.artist
+                    || Some(cleaned_entry.track.clone()) == args.track)
+                    ^ (args.artist.is_none() && args.track.is_none())
+                {
+                    table.add_row([
+                        &cleaned_entry.artist,
+                        &cleaned_entry.track,
+                        &cleaned_entry.ms_played.num_milliseconds().to_string(),
+                    ]);
                 }
             }
             println!("{}", table);

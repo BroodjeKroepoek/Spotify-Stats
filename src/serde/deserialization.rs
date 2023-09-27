@@ -20,7 +20,8 @@ where
     D: Deserializer<'de>,
 {
     let s: String = Deserialize::deserialize(deserializer)?;
-    NaiveDateTime::parse_from_str(&s, "%Y-%m-%d %H:%M").map_err(de::Error::custom)
+    // "2013-05-03T16:34:58Z"
+    NaiveDateTime::parse_from_str(&s, "%Y-%m-%dT%H:%M:%SZ").map_err(de::Error::custom)
 }
 
 pub fn duration_deserialization<'de, D>(deserializer: D) -> Result<Duration, D::Error>

@@ -1,5 +1,5 @@
 [package]
-name = "spotify-stats"
+name = "spot_stats"
 version = "0.1.0"
 edition = "2021"
 authors = ["Arno Werkman"]
@@ -14,9 +14,9 @@ comfy-table = "7.0.1"
 serde = { version = "1.0.188", features = ["derive"] }
 serde_json = { version = "1.0.107", features = ["preserve_order"] }
 
-[dev-dependencies]
-criterion = "0.5.1"
+# [dev-dependencies]
+# criterion = "0.5.1"
 
-[[bench]]
-name = "benchmark"
-harness = false
+# [[bench]]
+# name = "benchmark"
+# harness = false
