@@ -83,6 +83,9 @@ struct MyCLI {
     /// The name of the track to search for
     #[arg(short, long)]
     track: Option<String>,
+    // The name of the platform to search for
+    #[arg(short, long)]
+    platform: Option<String>,
     /// The formatting to use when printing the results to stdout
     #[arg(short, long, value_enum, default_value_t)]
     format: Format,
@@ -121,6 +124,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
     match args.format {
         Format::Json => {
+            // TODO: remove this match, and use macro's and predicates
             let json = match (args.artist, args.track) {
                 (None, None) => serde_json::to_string_pretty(&streaming_data)?,
                 (None, Some(args_track)) => {
@@ -155,8 +159,10 @@ fn main() -> Result<(), Box<dyn Error>> {
             table.load_preset(ASCII_MARKDOWN);
             table.set_header(["Artist", "Track", "Platform", "Time Played (ms)"]);
             iterate_nested_map!(streaming_data, artist, track, platform, time, {
-                if (Some(&artist) == args.artist.as_ref() || Some(&track) == args.track.as_ref())
-                    ^ (args.artist.is_none() && args.track.is_none())
+                if (Some(&artist) == args.artist.as_ref()
+                    || Some(&track) == args.track.as_ref()
+                    || Some(&platform) == args.platform.as_ref())
+                    ^ (args.artist.is_none() && args.track.is_none() && args.platform.is_none())
                 {
                     table.add_row([
                         &artist,
@@ -181,8 +187,9 @@ fn main() -> Result<(), Box<dyn Error>> {
             table.set_header(["Artist", "Track", "Platform", "Time Played (ms)"]);
             for cleaned_entry in cleaned_entries.0 {
                 if (Some(&cleaned_entry.artist) == args.artist.as_ref()
-                    || Some(&cleaned_entry.track) == args.track.as_ref())
-                    ^ (args.artist.is_none() && args.track.is_none())
+                    || Some(&cleaned_entry.track) == args.track.as_ref()
+                    || Some(&cleaned_entry.platform) == args.platform.as_ref())
+                    ^ (args.artist.is_none() && args.track.is_none() && args.platform.is_none())
                 {
                     table.add_row([
                         &cleaned_entry.artist,
