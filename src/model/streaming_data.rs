@@ -78,12 +78,18 @@ impl AddAssign for TimeIdent {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+pub struct TrackId {
+    pub track: String,
+    pub url: Option<String>,
+}
+
 /// Everthing as `SpotifyEntry`, but combining all the stats on a per-track basis
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CleanedSpotifyEntry {
     pub artist: String,
     pub album: String,
-    pub track: String,
+    pub track_id: TrackId,
     pub platform: String,
     #[serde(
         deserialize_with = "duration_deserialization",
@@ -126,7 +132,10 @@ impl From<FoldedStreamingData> for CleanedStreamingData {
             accumulator.push(CleanedSpotifyEntry {
                 artist: artist.clone(),
                 album: album.clone(),
-                track: track.clone(),
+                track_id: TrackId {
+                    track: track.to_string(),
+                    url: None,
+                },
                 platform: platform.clone(),
                 ms_played: time.ms_played,
                 end_times: time.end_times.clone(),

@@ -42,6 +42,7 @@ use crate::serde::{
 /// ```
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
 pub struct SpotifyEntry {
+    // Append type
     #[serde(
         deserialize_with = "naive_date_time_deserialization",
         serialize_with = "naive_date_time_serialization"
@@ -49,6 +50,7 @@ pub struct SpotifyEntry {
     pub ts: NaiveDateTime,
     pub username: String,
     pub platform: String,
+    // Sum type
     #[serde(
         deserialize_with = "duration_deserialization",
         serialize_with = "duration_serialization"

@@ -1,6 +1,6 @@
 use std::{error::Error, fs};
 
-use crate::model::{
+use spot_stats::model::{
     raw_streaming_data::RawStreamingData,
     streaming_data::{CleanedStreamingData, FoldedStreamingData},
     Persist,

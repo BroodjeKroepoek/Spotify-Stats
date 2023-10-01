@@ -1,6 +1,3 @@
-// Module definitions
-pub mod model;
-pub mod serde;
 #[cfg(test)]
 pub mod tests;
 
@@ -18,9 +15,10 @@ use std::io::Write;
 // Dependency imports
 use clap::{Parser, ValueEnum};
 use comfy_table::{presets::ASCII_MARKDOWN, Table};
+use spot_stats::{insert_nested_map, iterate_nested_map};
 
 // Modular imports
-use crate::model::{
+use spot_stats::model::{
     raw_streaming_data::RawStreamingData,
     streaming_data::{CleanedStreamingData, FoldedStreamingData},
     Persist,
@@ -194,14 +192,14 @@ fn main() -> Result<(), Box<dyn Error>> {
             for cleaned_entry in cleaned_entries.0 {
                 if (Some(&cleaned_entry.artist) == args.artist.as_ref()
                     || Some(&cleaned_entry.artist) == args.album.as_ref()
-                    || Some(&cleaned_entry.track) == args.track.as_ref()
+                    || Some(&cleaned_entry.track_id.track) == args.track.as_ref()
                     || Some(&cleaned_entry.platform) == args.platform.as_ref())
                     ^ (args.artist.is_none() && args.track.is_none() && args.platform.is_none())
                 {
                     table.add_row([
                         &cleaned_entry.artist,
                         &cleaned_entry.album,
-                        &cleaned_entry.track,
+                        &cleaned_entry.track_id.track,
                         &cleaned_entry.platform,
                         &cleaned_entry.ms_played.num_milliseconds().to_string(),
                     ]);
