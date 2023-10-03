@@ -1,9 +1,7 @@
 #[cfg(test)]
 pub mod tests;
 
-// Std imports
 use std::{
-    collections::BTreeMap,
     error::Error,
     fs::File,
     io::{stdout, Stdout},
@@ -12,12 +10,10 @@ use std::{
 
 use std::io::Write;
 
-// Dependency imports
 use clap::{Parser, ValueEnum};
 use comfy_table::{presets::ASCII_MARKDOWN, Table};
-use spot_stats::{insert_nested_map, iterate_nested_map};
+use spot_stats::iterate_nested_map;
 
-// Modular imports
 use spot_stats::model::{
     raw_streaming_data::RawStreamingData,
     streaming_data::{CleanedStreamingData, FoldedStreamingData},
@@ -26,36 +22,12 @@ use spot_stats::model::{
 
 #[derive(Debug, Clone, ValueEnum, Default)]
 enum Format {
-    /// Use JSON formatting
-    ///
-    /// The JSON looks like:
-    ///
-    /// ```json
-    /// {
-    ///     "Lizzo": {
-    ///         "About Damn Time": {
-    ///             "end_times": [
-    ///                 ...
-    ///             ],
-    ///             "ms_played": 6520330
-    ///         }
-    ///     }
-    /// }
-    /// ```
-    Json,
     /// Use table formatting
-    ///
-    /// The table looks like:
-    ///
-    /// ```markdown
-    /// | Artist | Track           | Time Played (ms) |
-    /// |--------|-----------------|------------------|
-    /// | Lizzo  | About Damn Time | 6520330          |
-    /// | ...    | ...             | ...              |
-    /// ```
     #[default]
     Table,
-    /// `Table` formatting, but sorted, for now
+    /// Use JSON formatting
+    Json,
+    /// `Table` formatting, but sorted.
     Sorted,
 }
 
@@ -90,10 +62,7 @@ struct MyCLI {
     /// The formatting to use when printing the results to stdout
     #[arg(short, long, value_enum, default_value_t)]
     format: Format,
-    /// The folder to extract the data from
-    ///
-    /// After one time running this executable it will create a summarized file, that contains everything from this folder!
-    /// So after one run it is no longer necessary to supply this argument, because it won't do anything if the summarized file is detected.
+    /// The folder to extract the data from, required on first run.
     #[arg(short, long)]
     data: Option<PathBuf>,
     #[arg(short, long, value_enum, default_value_t)]
@@ -125,54 +94,23 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
     match args.format {
         Format::Json => {
-            // TODO: remove this match, and use macro's and predicates
-            let json = match (args.artist, args.track) {
-                (None, None) => serde_json::to_string_pretty(&streaming_data)?,
-                (None, Some(args_track)) => {
-                    let mut accumulator = FoldedStreamingData(BTreeMap::new());
-                    iterate_nested_map!(streaming_data, artist, album, track, platform, time, {
-                        if track == &args_track {
-                            insert_nested_map!(
-                                accumulator,
-                                artist.clone(),
-                                album.clone(),
-                                track.clone(),
-                                platform.clone(),
-                                time.clone()
-                            )
-                        }
-                    });
-                    serde_json::to_string_pretty(&accumulator)?
-                }
-                (Some(args_artist), None) => {
-                    serde_json::to_string_pretty(&streaming_data.0[&args_artist])?
-                }
-                (Some(args_artist), Some(args_track)) => {
-                    serde_json::to_string_pretty(&streaming_data.0[&args_artist][&args_track])?
-                }
-            };
-            match output_stream {
-                OutputRuntime::Stdout(mut x) => x.write_all(json.as_bytes())?,
-                OutputRuntime::File(mut x) => x.write_all(json.as_bytes())?,
-            };
+            // TODO: Redo this
         }
         Format::Table => {
             let mut table = Table::new();
             table.load_preset(ASCII_MARKDOWN);
-            table.set_header(["Artist", "Album", "Track", "Platform", "Time Played (ms)"]);
-            iterate_nested_map!(streaming_data, artist, album, track, platform, time, {
+            table.set_header(["Artist", "Album", "Track", "Time Played (ms)"]);
+            iterate_nested_map!(streaming_data, artist, album, track, info, {
                 if (Some(artist) == args.artist.as_ref()
                     || Some(album) == args.album.as_ref()
-                    || Some(track) == args.track.as_ref()
-                    || Some(platform) == args.platform.as_ref())
-                    ^ (args.artist.is_none() && args.track.is_none() && args.platform.is_none())
+                    || Some(track) == args.track.as_ref())
+                    ^ (args.artist.is_none() && args.album.is_none() && args.track.is_none())
                 {
                     table.add_row([
-                        &artist,
-                        &album,
-                        &track,
-                        &platform,
-                        &time.ms_played.num_milliseconds().to_string(),
+                        artist,
+                        album,
+                        track,
+                        &info.total_ms_played.num_milliseconds().to_string(),
                     ]);
                 }
             });
@@ -185,23 +123,24 @@ fn main() -> Result<(), Box<dyn Error>> {
             let mut cleaned_entries = CleanedStreamingData::from(streaming_data);
             cleaned_entries
                 .0
-                .sort_by(|a, b| a.ms_played.cmp(&b.ms_played));
+                .sort_by(|a, b| a.total_ms_played.cmp(&b.total_ms_played));
             let mut table = Table::new();
             table.load_preset(ASCII_MARKDOWN);
-            table.set_header(["Artist", "Track", "Platform", "Time Played (ms)"]);
+            table.set_header(["Artist", "Album", "Track", "Time Played (ms)"]);
             for cleaned_entry in cleaned_entries.0 {
                 if (Some(&cleaned_entry.artist) == args.artist.as_ref()
-                    || Some(&cleaned_entry.artist) == args.album.as_ref()
-                    || Some(&cleaned_entry.track_id.track) == args.track.as_ref()
-                    || Some(&cleaned_entry.platform) == args.platform.as_ref())
-                    ^ (args.artist.is_none() && args.track.is_none() && args.platform.is_none())
+                    || Some(&cleaned_entry.album) == args.album.as_ref()
+                    || Some(&cleaned_entry.track) == args.track.as_ref())
+                    ^ (args.artist.is_none()
+                        && args.album.is_none()
+                        && args.track.is_none()
+                        && args.platform.is_none())
                 {
                     table.add_row([
-                        &cleaned_entry.artist,
-                        &cleaned_entry.album,
-                        &cleaned_entry.track_id.track,
-                        &cleaned_entry.platform,
-                        &cleaned_entry.ms_played.num_milliseconds().to_string(),
+                        cleaned_entry.artist,
+                        cleaned_entry.album,
+                        cleaned_entry.track,
+                        cleaned_entry.total_ms_played.num_milliseconds().to_string(),
                     ]);
                 }
             }

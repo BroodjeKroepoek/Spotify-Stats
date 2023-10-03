@@ -11,6 +11,8 @@ use crate::serde::{
     serialization::{duration_serialization, naive_date_time_serialization},
 };
 
+use super::Persist;
+
 /// # Entry
 ///
 /// This is what an one singular entry looks like in the Spotify JSON extended streaming data, the full data consists of multiple entries.
@@ -42,15 +44,13 @@ use crate::serde::{
 /// ```
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
 pub struct SpotifyEntry {
-    // Append type
     #[serde(
         deserialize_with = "naive_date_time_deserialization",
         serialize_with = "naive_date_time_serialization"
     )]
     pub ts: NaiveDateTime,
-    pub username: String,
-    pub platform: String,
-    // Sum type
+    pub username: Option<String>,
+    pub platform: Option<String>,
     #[serde(
         deserialize_with = "duration_deserialization",
         serialize_with = "duration_serialization"
@@ -71,7 +71,7 @@ pub struct SpotifyEntry {
     pub shuffle: Option<bool>,
     pub skipped: Option<bool>,
     pub offline: Option<bool>,
-    pub offline_timestamp: Option<u64>,
+    pub offline_timestamp: Option<u128>,
     pub incognito_mode: Option<bool>,
 }
 
@@ -91,4 +91,8 @@ impl RawStreamingData {
         }
         Ok(accumulator)
     }
+}
+
+impl Persist for RawStreamingData {
+    type Error = std::io::Error;
 }
