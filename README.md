@@ -28,7 +28,7 @@ spotify-stats --help
 
 ## Milestones
 
-- [ ] Implement a 'top x' feature, showing your top *x* most listened to songs / artist, in sorted order.
+- [x] Implement a 'top x' feature, showing your top *x* most listened to songs / artist, in sorted order.
 - [ ] Maybe change the 'StreamingHistory' struct to again include durations per entry of the original Spotify data, instead of summing it over each track.
 - [ ] Do something with the end timings, we don't use that data now.
   - [ ] Maybe the first date you ever listened to the song / artist, and the last date you did.

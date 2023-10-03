@@ -10,7 +10,7 @@ use std::{
 
 use std::io::Write;
 
-use clap::{Parser, ValueEnum};
+use clap::{Parser, Subcommand, ValueEnum};
 use comfy_table::{presets::ASCII_MARKDOWN, Table};
 use spot_stats::iterate_nested_map;
 
@@ -20,15 +20,19 @@ use spot_stats::model::{
     Persist,
 };
 
-#[derive(Debug, Clone, ValueEnum, Default)]
+#[derive(Debug, Clone, Default, Subcommand)]
 enum Format {
-    /// Use table formatting
+    /// Use table formatting.
     #[default]
     Table,
-    /// Use JSON formatting
+    /// Use JSON formatting.
     Json,
-    /// `Table` formatting, but sorted.
-    Sorted,
+    /// Use table formatting, but displaying your `top x`.
+    Sorted {
+        /// Amount of track to display in sorted order.
+        #[arg(default_value_t)]
+        amount_tracks: usize,
+    },
 }
 
 #[derive(Debug, Clone, ValueEnum, Default)]
@@ -47,20 +51,17 @@ enum OutputRuntime {
 #[derive(Parser, Debug)]
 #[clap(version, author)]
 struct MyCLI {
-    /// The name of the artist to search for
+    /// The name of the artist to search for.
     #[arg(long)]
     artist: Option<String>,
-    /// The name of the album to search for
+    /// The name of the album to search for.
     #[arg(long)]
     album: Option<String>,
-    /// The name of the track to search for
+    /// The name of the track to search for.
     #[arg(long)]
     track: Option<String>,
-    /// The name of the platform to search for
-    #[arg(long)]
-    platform: Option<String>,
-    /// The formatting to use when printing the results to stdout
-    #[arg(short, long, value_enum, default_value_t)]
+    /// The formatting to use when printing the results to stdout.
+    #[command(subcommand)]
     format: Format,
     /// The folder to extract the data from, required on first run.
     #[arg(short, long)]
@@ -69,7 +70,7 @@ struct MyCLI {
     output: Output,
 }
 
-const JSON_DATA_PATH: &str = "spot_stats.json";
+const JSON_DATA_PATH: &str = "spot_stats_folded.json";
 const OUTPUT_PATH: &str = "spot_stats_output.txt";
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -84,7 +85,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 streaming_data
             }
             None => {
-                panic!("the '--data <DATA>' argument was not provided, this is needed the first time only")
+                panic!("the '--data <DATA>' argument was not provided, required on first run.")
             }
         },
     };
@@ -119,30 +120,34 @@ fn main() -> Result<(), Box<dyn Error>> {
                 OutputRuntime::File(mut x) => x.write_all(table.to_string().as_bytes())?,
             }
         }
-        Format::Sorted => {
+        Format::Sorted { amount_tracks } => {
+            let mut counter = 1;
             let mut cleaned_entries = CleanedStreamingData::from(streaming_data);
             cleaned_entries
                 .0
-                .sort_by(|a, b| a.total_ms_played.cmp(&b.total_ms_played));
+                .sort_by(|a, b| a.total_ms_played.cmp(&b.total_ms_played).reverse());
             let mut table = Table::new();
             table.load_preset(ASCII_MARKDOWN);
-            table.set_header(["Artist", "Album", "Track", "Time Played (ms)"]);
+            table.set_header(["Rank", "Artist", "Album", "Track", "Time Played (ms)"]);
             for cleaned_entry in cleaned_entries.0 {
                 if (Some(&cleaned_entry.artist) == args.artist.as_ref()
                     || Some(&cleaned_entry.album) == args.album.as_ref()
                     || Some(&cleaned_entry.track) == args.track.as_ref())
-                    ^ (args.artist.is_none()
-                        && args.album.is_none()
-                        && args.track.is_none()
-                        && args.platform.is_none())
+                    ^ (args.artist.is_none() && args.album.is_none() && args.track.is_none())
                 {
-                    table.add_row([
-                        cleaned_entry.artist,
-                        cleaned_entry.album,
-                        cleaned_entry.track,
-                        cleaned_entry.total_ms_played.num_milliseconds().to_string(),
-                    ]);
+                    if counter <= amount_tracks || amount_tracks == 0 {
+                        table.add_row([
+                            counter.to_string(),
+                            cleaned_entry.artist.clone(),
+                            cleaned_entry.album.clone(),
+                            cleaned_entry.track.clone(),
+                            cleaned_entry.total_ms_played.num_milliseconds().to_string(),
+                        ]);
+                    } else {
+                        break;
+                    }
                 }
+                counter += 1;
             }
             match output_stream {
                 OutputRuntime::Stdout(mut x) => x.write_all(table.to_string().as_bytes())?,
