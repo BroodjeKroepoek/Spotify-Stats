@@ -1,9 +1,11 @@
 [package]
-name = "spot_stats"
+name = "spotify_stats"
 version = "0.1.0"
 edition = "2021"
 authors = ["Arno Werkman"]
 description = "Command Line Interface that can process your Spotify Streaming Data"
+license = "MIT"
+repository = "https://github.com/BroodjeKroepoek/Spotify-Stats"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -17,3 +19,9 @@ serde_json = { version = "1.0.107", features = ["preserve_order"] }
 
 [lib]
 path = "src/lib/mod.rs"
+
+[profile.release]
+strip = true
+codegen-units = 1
+lto = true
+panic = "abort"

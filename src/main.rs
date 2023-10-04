@@ -10,7 +10,7 @@ use bevy::{
 use clap::{Parser, Subcommand};
 use comfy_table::{presets::ASCII_MARKDOWN, Table};
 
-use spot_stats::{
+use spotify_stats::{
     gui::{animate_rotation, animate_scale, animate_translation, setup},
     iterate_nested_map,
     model::{
@@ -61,7 +61,7 @@ enum MyCliCommand {
 #[derive(Parser, Debug)]
 #[clap(version, author)]
 struct MyCLI {
-    /// REQUIRED ON FIRST RUN: The folder to extract the Spotify streamingdata from.
+    /// REQUIRED ON FIRST RUN: The folder to extract the Spotify streaming data from.
     ///
     /// After first run: A JSON file is created relative to this cli, that contains all the data summarized.
     #[arg(short, long)]
@@ -80,7 +80,7 @@ struct MyCLI {
     command: MyCliCommand,
 }
 
-const JSON_DATA_PATH: &str = "spot_stats_folded.json";
+const JSON_DATA_PATH: &str = "spotify_stats.json";
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args = MyCLI::parse();

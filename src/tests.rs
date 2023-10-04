@@ -1,6 +1,6 @@
 use std::{error::Error, fs};
 
-use spot_stats::model::{
+use spotify_stats::model::{
     raw_streaming_data::RawStreamingData,
     streaming_data::{CleanedStreamingData, FoldedStreamingData},
     Persist,
