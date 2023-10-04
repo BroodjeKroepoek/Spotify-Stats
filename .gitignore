@@ -2,6 +2,7 @@
 /data
 /full_data
 /test_full_data
+/assets
 spot_stats_folded.json
 spot_stats_output.txt
 .vscode

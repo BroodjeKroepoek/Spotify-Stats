@@ -4,20 +4,26 @@ pub mod tests;
 use std::{
     error::Error,
     fs::File,
+    io::Write,
     io::{stdout, Stdout},
     path::PathBuf,
 };
 
-use std::io::Write;
-
+use bevy::{
+    prelude::{App, Startup, Update},
+    DefaultPlugins,
+};
 use clap::{Parser, Subcommand, ValueEnum};
 use comfy_table::{presets::ASCII_MARKDOWN, Table};
-use spot_stats::iterate_nested_map;
 
-use spot_stats::model::{
-    raw_streaming_data::RawStreamingData,
-    streaming_data::{CleanedStreamingData, FoldedStreamingData},
-    Persist,
+use spot_stats::{
+    gui::{animate_rotation, animate_scale, animate_translation, setup},
+    iterate_nested_map,
+    model::{
+        raw_streaming_data::RawStreamingData,
+        streaming_data::{CleanedStreamingData, FoldedStreamingData},
+        Persist,
+    },
 };
 
 #[derive(Debug, Clone, Default, Subcommand)]
@@ -30,9 +36,13 @@ enum Format {
     /// Use table formatting, but displaying your `top x`.
     Sorted {
         /// Amount of track to display in sorted order.
+        ///
+        /// If no extra info is given, sort everything.
         #[arg(default_value_t)]
         amount_tracks: usize,
     },
+    /// GUI using bevy-engine!
+    Bevy,
 }
 
 #[derive(Debug, Clone, ValueEnum, Default)]
@@ -100,7 +110,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         Format::Table => {
             let mut table = Table::new();
             table.load_preset(ASCII_MARKDOWN);
-            table.set_header(["Artist", "Album", "Track", "Time Played (ms)"]);
+            table.set_header(["Artist", "Album", "Track", "Duration (ms)"]);
             iterate_nested_map!(streaming_data, artist, album, track, info, {
                 if (Some(artist) == args.artist.as_ref()
                     || Some(album) == args.album.as_ref()
@@ -128,7 +138,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .sort_by(|a, b| a.total_ms_played.cmp(&b.total_ms_played).reverse());
             let mut table = Table::new();
             table.load_preset(ASCII_MARKDOWN);
-            table.set_header(["Rank", "Artist", "Album", "Track", "Time Played (ms)"]);
+            table.set_header(["Rank", "Artist", "Album", "Track", "Duration (ms)"]);
             for cleaned_entry in cleaned_entries.0 {
                 if (Some(&cleaned_entry.artist) == args.artist.as_ref()
                     || Some(&cleaned_entry.album) == args.album.as_ref()
@@ -153,6 +163,16 @@ fn main() -> Result<(), Box<dyn Error>> {
                 OutputRuntime::Stdout(mut x) => x.write_all(table.to_string().as_bytes())?,
                 OutputRuntime::File(mut x) => x.write_all(table.to_string().as_bytes())?,
             }
+        }
+        Format::Bevy => {
+            App::new()
+                .add_plugins(DefaultPlugins)
+                .add_systems(Startup, setup)
+                .add_systems(
+                    Update,
+                    (animate_translation, animate_rotation, animate_scale),
+                )
+                .run();
         }
     }
     Ok(())
