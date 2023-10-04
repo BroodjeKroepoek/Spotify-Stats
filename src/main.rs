@@ -1,19 +1,13 @@
 #[cfg(test)]
 pub mod tests;
 
-use std::{
-    error::Error,
-    fs::File,
-    io::Write,
-    io::{stdout, Stdout},
-    path::PathBuf,
-};
+use std::{error::Error, fs::File, io::Write, path::PathBuf};
 
 use bevy::{
     prelude::{App, Startup, Update},
     DefaultPlugins,
 };
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{Parser, Subcommand};
 use comfy_table::{presets::ASCII_MARKDOWN, Table};
 
 use spot_stats::{
@@ -26,62 +20,67 @@ use spot_stats::{
     },
 };
 
-#[derive(Debug, Clone, Default, Subcommand)]
-enum Format {
-    /// Use table formatting.
-    #[default]
-    Table,
-    /// Use JSON formatting.
-    Json,
-    /// Use table formatting, but displaying your `top x`.
-    Sorted {
-        /// Amount of track to display in sorted order.
-        ///
-        /// If no extra info is given, sort everything.
-        #[arg(default_value_t)]
-        amount_tracks: usize,
+#[derive(Debug, Clone, Subcommand)]
+enum MyCliCommand {
+    /// Use tabular format.
+    ///
+    /// It's possible to only show entries that match your search query.
+    /// Everything is in lexicographical ordering.
+    Table {
+        /// Redirect output to a file.
+        #[arg(short, long)]
+        file: Option<PathBuf>,
     },
-    /// GUI using bevy-engine!
-    Bevy,
+    /// Use JSON format.
+    ///
+    /// It's possible to only show data that matches your search query.
+    /// The JSON is a nested map: `artist->album->track->[INFO]`.
+    Json {
+        /// Redirect output to a file.
+        #[arg(short, long)]
+        file: Option<PathBuf>,
+    },
+    /// Use tabular format but in sorted order according to `Duration` played.
+    ///
+    /// It's possible to only show entries that match your search query.
+    /// Everything is in sorted order, according to the last column `Duration`.
+    Sorted {
+        /// Display only `top <N>` entries.
+        n: Option<usize>,
+        /// Redirect output to a file.
+        #[arg(short, long)]
+        file: Option<PathBuf>,
+    },
+    /// Graphical User Interface.
+    ///
+    /// This gives an overview of all the information you would even want to know.
+    Gui,
 }
 
-#[derive(Debug, Clone, ValueEnum, Default)]
-enum Output {
-    #[default]
-    Stdout,
-    File,
-}
-
-enum OutputRuntime {
-    Stdout(Stdout),
-    File(File),
-}
-
-/// Command Line Interface that can process your Spotify Streaming Data
+/// Command Line Interface that can process your Spotify Streaming Data.
 #[derive(Parser, Debug)]
 #[clap(version, author)]
 struct MyCLI {
-    /// The name of the artist to search for.
-    #[arg(long)]
-    artist: Option<String>,
-    /// The name of the album to search for.
-    #[arg(long)]
-    album: Option<String>,
-    /// The name of the track to search for.
-    #[arg(long)]
-    track: Option<String>,
-    /// The formatting to use when printing the results to stdout.
-    #[command(subcommand)]
-    format: Format,
-    /// The folder to extract the data from, required on first run.
+    /// REQUIRED ON FIRST RUN: The folder to extract the Spotify streamingdata from.
+    ///
+    /// After first run: A JSON file is created relative to this cli, that contains all the data summarized.
     #[arg(short, long)]
     data: Option<PathBuf>,
-    #[arg(short, long, value_enum, default_value_t)]
-    output: Output,
+    /// Show only entries with this artist, or matching other queries provided.
+    #[arg(long)]
+    artist: Option<String>,
+    /// Show only entries from this album, or matching other queries provided.
+    #[arg(long)]
+    album: Option<String>,
+    /// Show only entries of this track, or matching other queries provided.
+    #[arg(long)]
+    track: Option<String>,
+    /// The format to use when presenting the results to the user.
+    #[command(subcommand)]
+    command: MyCliCommand,
 }
 
 const JSON_DATA_PATH: &str = "spot_stats_folded.json";
-const OUTPUT_PATH: &str = "spot_stats_output.txt";
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args = MyCLI::parse();
@@ -99,15 +98,12 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
         },
     };
-    let output_stream = match args.output {
-        Output::Stdout => OutputRuntime::Stdout(stdout()),
-        Output::File => OutputRuntime::File(File::create(OUTPUT_PATH).unwrap()),
-    };
-    match args.format {
-        Format::Json => {
+    match args.command {
+        MyCliCommand::Json { file: _ } => {
             // TODO: Redo this
+            unimplemented!()
         }
-        Format::Table => {
+        MyCliCommand::Table { file } => {
             let mut table = Table::new();
             table.load_preset(ASCII_MARKDOWN);
             table.set_header(["Artist", "Album", "Track", "Duration (ms)"]);
@@ -125,12 +121,14 @@ fn main() -> Result<(), Box<dyn Error>> {
                     ]);
                 }
             });
-            match output_stream {
-                OutputRuntime::Stdout(mut x) => x.write_all(table.to_string().as_bytes())?,
-                OutputRuntime::File(mut x) => x.write_all(table.to_string().as_bytes())?,
+            if let Some(path) = file {
+                let mut handle = File::create(path)?;
+                write!(handle, "{}", table)?;
+            } else {
+                println!("{}", table)
             }
         }
-        Format::Sorted { amount_tracks } => {
+        MyCliCommand::Sorted { n, file } => {
             let mut counter = 1;
             let mut cleaned_entries = CleanedStreamingData::from(streaming_data);
             cleaned_entries
@@ -145,7 +143,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     || Some(&cleaned_entry.track) == args.track.as_ref())
                     ^ (args.artist.is_none() && args.album.is_none() && args.track.is_none())
                 {
-                    if counter <= amount_tracks || amount_tracks == 0 {
+                    if counter <= n.unwrap_or_default() || n.is_none() {
                         table.add_row([
                             counter.to_string(),
                             cleaned_entry.artist.clone(),
@@ -159,12 +157,14 @@ fn main() -> Result<(), Box<dyn Error>> {
                 }
                 counter += 1;
             }
-            match output_stream {
-                OutputRuntime::Stdout(mut x) => x.write_all(table.to_string().as_bytes())?,
-                OutputRuntime::File(mut x) => x.write_all(table.to_string().as_bytes())?,
+            if let Some(path) = file {
+                let mut handle = File::create(path)?;
+                write!(handle, "{}", table)?;
+            } else {
+                println!("{}", table)
             }
         }
-        Format::Bevy => {
+        MyCliCommand::Gui => {
             App::new()
                 .add_plugins(DefaultPlugins)
                 .add_systems(Startup, setup)
