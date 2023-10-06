@@ -4,8 +4,7 @@ use chrono::{Duration, NaiveDateTime};
 use serde::{Deserialize, Serialize};
 
 use crate::serde::{
-    deserialization::{duration_deserialization, vec_of_naive_date_time_deserialization},
-    serialization::{duration_serialization, vec_of_naive_date_time_serialization},
+    deserialization::duration_deserialization, serialization::duration_serialization,
 };
 
 use super::{
@@ -13,26 +12,32 @@ use super::{
     Persist,
 };
 
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
+pub struct LogEntry(
+    #[serde(
+        deserialize_with = "duration_deserialization",
+        serialize_with = "duration_serialization"
+    )]
+    Duration, // ms_played
+    Option<String>, // reason_start
+    Option<String>, // reason_end
+);
+
 // This should ideally be in 3rd normal form, or 5th normal form.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
 pub struct Information {
-    #[serde(
-        deserialize_with = "vec_of_naive_date_time_deserialization",
-        serialize_with = "vec_of_naive_date_time_serialization"
-    )]
-    pub timestamps: Vec<NaiveDateTime>,
+    pub log: BTreeMap<NaiveDateTime, LogEntry>,
     #[serde(
         deserialize_with = "duration_deserialization",
         serialize_with = "duration_serialization"
     )]
     pub total_ms_played: Duration,
-    pub reasons_start: Vec<String>,
-    pub reasons_end: Vec<String>,
+    pub spotify_track_uri: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
 pub struct FoldedStreamingData(
-    //           Artist           Album            Track,  Ident
+    //           Artist           Album            Track,  Info
     pub BTreeMap<String, BTreeMap<String, BTreeMap<String, Information>>>,
 );
 
@@ -50,6 +55,7 @@ macro_rules! insert_nested_map {
     }};
 }
 
+// FIXME: This is probably very inefficient when searching on `artist`, `album`, because we traverse unnecessary entries
 #[macro_export]
 macro_rules! iterate_nested_map {
     ($map:expr, $key1:ident, $key2:ident, $key3:ident, $val:ident, $body:block) => {
@@ -65,31 +71,31 @@ macro_rules! iterate_nested_map {
 
 impl From<&SpotifyEntry> for Information {
     fn from(value: &SpotifyEntry) -> Self {
+        let mut log = BTreeMap::new();
+        log.insert(
+            value.ts,
+            LogEntry(
+                value.ms_played,
+                value.reason_start.clone(),
+                value.reason_end.clone(),
+            ),
+        );
         Self {
-            timestamps: vec![value.ts],
             total_ms_played: value.ms_played,
-            reasons_start: vec![value
-                .reason_start
-                .clone()
-                .unwrap_or_else(|| "None".to_string())],
-            reasons_end: vec![value
-                .reason_end
-                .clone()
-                .unwrap_or_else(|| "None".to_string())],
+            log,
+            spotify_track_uri: value.spotify_track_uri.clone(),
         }
     }
 }
 
 impl AddAssign for Information {
     fn add_assign(&mut self, rhs: Self) {
-        self.timestamps.extend(rhs.timestamps);
         self.total_ms_played = self.total_ms_played + rhs.total_ms_played;
-        self.reasons_start.extend(rhs.reasons_start);
-        self.reasons_end.extend(rhs.reasons_end);
+        self.log.extend(rhs.log);
     }
 }
 
-/// Everthing as `SpotifyEntry`, but combining all the stats on a per-track basis
+/// Everything as `SpotifyEntry`, but combining all the stats on a per-track basis
 ///
 /// The full uncleaned version, in `raw_streaming_data.rs` looks like:
 ///
@@ -134,13 +140,6 @@ pub struct CleanedSpotifyEntry {
         serialize_with = "duration_serialization"
     )]
     pub total_ms_played: Duration,
-    #[serde(
-        deserialize_with = "vec_of_naive_date_time_deserialization",
-        serialize_with = "vec_of_naive_date_time_serialization"
-    )]
-    pub timestamps: Vec<NaiveDateTime>,
-    pub reasons_start: Vec<String>,
-    pub reasons_end: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
@@ -159,9 +158,6 @@ impl From<FoldedStreamingData> for CleanedStreamingData {
                 album: album.clone(),
                 track: track.clone(),
                 total_ms_played: info.total_ms_played,
-                timestamps: info.timestamps.clone(),
-                reasons_start: info.reasons_start.clone(),
-                reasons_end: info.reasons_end.clone(),
             });
         });
         CleanedStreamingData(accumulator)
