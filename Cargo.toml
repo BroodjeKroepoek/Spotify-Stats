@@ -10,6 +10,7 @@ repository = "https://github.com/BroodjeKroepoek/Spotify-Stats"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+belly = { git = "https://github.com/jkb0o/belly", version = "0.3.0" }
 bevy = "0.11.3"
 chrono = { version = "0.4.31", features = ["serde"] }
 clap = { version = "4.4.6", features = ["derive"] }

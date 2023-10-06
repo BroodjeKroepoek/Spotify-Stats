@@ -3,15 +3,16 @@ pub mod tests;
 
 use std::{error::Error, fs::File, io::Write, path::PathBuf};
 
+use belly::prelude::BellyPlugin;
 use bevy::{
-    prelude::{App, Startup, Update},
+    prelude::{App, Startup},
     DefaultPlugins,
 };
 use clap::{Parser, Subcommand};
 use comfy_table::{presets::ASCII_MARKDOWN, Table};
 
 use spotify_stats::{
-    gui::{animate_rotation, animate_scale, animate_translation, setup},
+    gui::setup,
     iterate_nested_map,
     model::{
         raw_streaming_data::RawStreamingData,
@@ -167,11 +168,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         MyCliCommand::Gui => {
             App::new()
                 .add_plugins(DefaultPlugins)
+                .add_plugins(BellyPlugin)
                 .add_systems(Startup, setup)
-                .add_systems(
-                    Update,
-                    (animate_translation, animate_rotation, animate_scale),
-                )
                 .run();
         }
     }
