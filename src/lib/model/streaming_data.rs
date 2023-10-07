@@ -23,17 +23,20 @@ pub struct LogEntry(
     Option<String>, // reason_end
 );
 
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
+pub struct Log(pub BTreeMap<NaiveDateTime, LogEntry>);
+
 // This should ideally be in 3rd normal form, or 5th normal form.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
-pub struct Information {
-    pub log: BTreeMap<NaiveDateTime, LogEntry>,
+pub struct Information(
+    pub Log, // log
     #[serde(
         deserialize_with = "duration_deserialization",
         serialize_with = "duration_serialization"
     )]
-    pub total_ms_played: Duration,
-    pub spotify_track_uri: Option<String>,
-}
+    pub Duration, // total_ms_played
+    pub Option<String>, // spotify_track_url
+);
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
 pub struct FoldedStreamingData(
@@ -55,7 +58,6 @@ macro_rules! insert_nested_map {
     }};
 }
 
-// FIXME: This is probably very inefficient when searching on `artist`, `album`, because we traverse unnecessary entries
 #[macro_export]
 macro_rules! iterate_nested_map {
     ($map:expr, $key1:ident, $key2:ident, $key3:ident, $val:ident, $body:block) => {
@@ -80,18 +82,14 @@ impl From<&SpotifyEntry> for Information {
                 value.reason_end.clone(),
             ),
         );
-        Self {
-            total_ms_played: value.ms_played,
-            log,
-            spotify_track_uri: value.spotify_track_uri.clone(),
-        }
+        Self(Log(log), value.ms_played, value.spotify_track_uri.clone())
     }
 }
 
 impl AddAssign for Information {
     fn add_assign(&mut self, rhs: Self) {
-        self.total_ms_played = self.total_ms_played + rhs.total_ms_played;
-        self.log.extend(rhs.log);
+        self.1 = self.1 + rhs.1;
+        self.0 .0.extend(rhs.0 .0);
     }
 }
 
@@ -140,6 +138,7 @@ pub struct CleanedSpotifyEntry {
         serialize_with = "duration_serialization"
     )]
     pub total_ms_played: Duration,
+    pub log: Log,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
@@ -157,7 +156,8 @@ impl From<FoldedStreamingData> for CleanedStreamingData {
                 artist: artist.clone(),
                 album: album.clone(),
                 track: track.clone(),
-                total_ms_played: info.total_ms_played,
+                total_ms_played: info.1,
+                log: info.0.clone(),
             });
         });
         CleanedStreamingData(accumulator)

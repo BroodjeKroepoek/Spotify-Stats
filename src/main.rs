@@ -87,7 +87,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let args = MyCLI::parse();
     let streaming_data = match FoldedStreamingData::load(JSON_DATA_PATH) {
         Ok(streaming_data) => streaming_data,
-        Err(_) => match args.data {
+        Err(err) => match args.data {
             Some(path) => {
                 let raw_streaming_data: RawStreamingData = RawStreamingData::from_path(&path)?;
                 let streaming_data = FoldedStreamingData::from(raw_streaming_data);
@@ -95,13 +95,14 @@ fn main() -> Result<(), Box<dyn Error>> {
                 streaming_data
             }
             None => {
-                panic!("the '--data <DATA>' argument was not provided, required on first run.")
+                debug_assert_eq!(err.kind(), std::io::ErrorKind::NotFound);
+                panic!("the '--data <DATA>' argument was not provided, required on first run.");
             }
         },
     };
     match args.command {
         MyCliCommand::Json { file: _ } => {
-            // TODO: Redo this
+            // TODO: Implement this
             unimplemented!()
         }
         MyCliCommand::Table { file } => {
@@ -114,12 +115,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     || Some(track) == args.track.as_ref())
                     ^ (args.artist.is_none() && args.album.is_none() && args.track.is_none())
                 {
-                    table.add_row([
-                        artist,
-                        album,
-                        track,
-                        &info.total_ms_played.num_milliseconds().to_string(),
-                    ]);
+                    table.add_row([artist, album, track, &info.1.num_milliseconds().to_string()]);
                 }
             });
             if let Some(path) = file {
@@ -152,11 +148,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                             cleaned_entry.track.clone(),
                             cleaned_entry.total_ms_played.num_milliseconds().to_string(),
                         ]);
-                    } else {
-                        break;
+                        counter += 1;
                     }
                 }
-                counter += 1;
             }
             if let Some(path) = file {
                 let mut handle = File::create(path)?;
