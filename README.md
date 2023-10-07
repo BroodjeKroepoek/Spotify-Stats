@@ -29,13 +29,13 @@ spotify-stats --help
 ## Milestones
 
 - [x] Implement a 'top x' feature, showing your top *x* most listened to songs / artist, in sorted order.
-- [ ] Maybe change the 'StreamingHistory' struct to again include durations per entry of the original Spotify data, instead of summing it over each track.
+- [x] Maybe change the 'StreamingHistory' struct to again include durations per entry of the original Spotify data, instead of summing it over each track.
 - [ ] Do something with the end timings, we don't use that data now.
   - [ ] Maybe the first date you ever listened to the song / artist, and the last date you did.
   - [ ] Or show the day that you 'binge listened', to a specific song / artist.
 - [ ] Using the Spotify API to create a playlist of your 'top x' favourite songs.
   - [ ] This will need some sort of persistent storage and credentials.
 - [ ] *ms* listened to, is not very easy to read.
-- [ ] Can API calls also supply us with streaming data?
+- [x] Can API calls also supply us with streaming data? -> Not really.
 - [ ] Add case insensitivity to searching, and maybe Levenshtein distance, so making small spelling errors is allowed.
 - [ ] Add benchmarks for persistence?
