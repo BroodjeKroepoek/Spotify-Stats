@@ -11,8 +11,8 @@ const DATA_FOLDER: &str = "full_data";
 #[test]
 fn test_isomorphism_raw_internal_streaming_history() -> Result<(), Box<dyn Error>> {
     let initial_entries = RawStreamingData::from_path(DATA_FOLDER)?;
-    let initial_json_representation = serde_json::to_string(&initial_entries)?;
-    let secondary_entries: RawStreamingData = serde_json::from_str(&initial_json_representation)?;
+    let initial_json_representation = postcard::to_stdvec(&initial_entries)?;
+    let secondary_entries: RawStreamingData = postcard::from_bytes(&initial_json_representation)?;
     assert_eq!(initial_entries, secondary_entries);
     Ok(())
 }
@@ -20,9 +20,9 @@ fn test_isomorphism_raw_internal_streaming_history() -> Result<(), Box<dyn Error
 #[test]
 fn test_isomorphism_raw_external_streaming_history() -> Result<(), Box<dyn Error>> {
     let initial_entries = RawStreamingData::from_path(DATA_FOLDER)?;
-    let initial_json_representation = serde_json::to_string(&initial_entries)?;
-    let secondary_entries: RawStreamingData = serde_json::from_str(&initial_json_representation)?;
-    let secondary_json_representation = serde_json::to_string(&secondary_entries)?;
+    let initial_json_representation = postcard::to_stdvec(&initial_entries)?;
+    let secondary_entries: RawStreamingData = postcard::from_bytes(&initial_json_representation)?;
+    let secondary_json_representation = postcard::to_stdvec(&secondary_entries)?;
     assert_eq!(initial_json_representation, secondary_json_representation);
     Ok(())
 }
@@ -31,9 +31,9 @@ fn test_isomorphism_raw_external_streaming_history() -> Result<(), Box<dyn Error
 fn test_isomorphism_folded_internal_streaming_history() -> Result<(), Box<dyn Error>> {
     let initial_entries = RawStreamingData::from_path(DATA_FOLDER)?;
     let initial_cleaned = FoldedStreamingData::from(initial_entries);
-    let initial_json_cleaned_representation = serde_json::to_string(&initial_cleaned)?;
+    let initial_json_cleaned_representation = postcard::to_stdvec(&initial_cleaned)?;
     let secondary_cleaned: FoldedStreamingData =
-        serde_json::from_str(&initial_json_cleaned_representation)?;
+        postcard::from_bytes(&initial_json_cleaned_representation)?;
     assert_eq!(initial_cleaned, secondary_cleaned);
     Ok(())
 }
@@ -42,10 +42,10 @@ fn test_isomorphism_folded_internal_streaming_history() -> Result<(), Box<dyn Er
 fn test_isomorphism_folded_external_streaming_history() -> Result<(), Box<dyn Error>> {
     let initial_entries = RawStreamingData::from_path(DATA_FOLDER)?;
     let initial_cleaned = FoldedStreamingData::from(initial_entries);
-    let initial_json_cleaned_representation = serde_json::to_string(&initial_cleaned)?;
+    let initial_json_cleaned_representation = postcard::to_stdvec(&initial_cleaned)?;
     let secondary_cleaned: FoldedStreamingData =
-        serde_json::from_str(&initial_json_cleaned_representation)?;
-    let secondary_json_cleaned_representation = serde_json::to_string(&secondary_cleaned)?;
+        postcard::from_bytes(&initial_json_cleaned_representation)?;
+    let secondary_json_cleaned_representation = postcard::to_stdvec(&secondary_cleaned)?;
     assert_eq!(
         initial_json_cleaned_representation,
         secondary_json_cleaned_representation
@@ -70,9 +70,9 @@ fn test_isomorphism_cleaned_internal_streaming_history() -> Result<(), Box<dyn E
     let initial_entries = RawStreamingData::from_path(DATA_FOLDER)?;
     let initial_folded = FoldedStreamingData::from(initial_entries);
     let initial_cleaned = CleanedStreamingData::from(initial_folded);
-    let initial_json_cleaned_representation = serde_json::to_string(&initial_cleaned)?;
+    let initial_json_cleaned_representation = postcard::to_stdvec(&initial_cleaned)?;
     let secondary_cleaned: CleanedStreamingData =
-        serde_json::from_str(&initial_json_cleaned_representation)?;
+        postcard::from_bytes(&initial_json_cleaned_representation)?;
     assert_eq!(initial_cleaned, secondary_cleaned);
     Ok(())
 }
@@ -82,10 +82,10 @@ fn test_isomorphism_cleaned_external_streaming_history() -> Result<(), Box<dyn E
     let initial_entries = RawStreamingData::from_path(DATA_FOLDER)?;
     let initial_folded = FoldedStreamingData::from(initial_entries);
     let initial_cleaned = CleanedStreamingData::from(initial_folded);
-    let initial_json_cleaned_representation = serde_json::to_string(&initial_cleaned)?;
+    let initial_json_cleaned_representation = postcard::to_stdvec(&initial_cleaned)?;
     let secondary_cleaned: CleanedStreamingData =
-        serde_json::from_str(&initial_json_cleaned_representation)?;
-    let secondary_json_cleaned_representation = serde_json::to_string(&secondary_cleaned)?;
+        postcard::from_bytes(&initial_json_cleaned_representation)?;
+    let secondary_json_cleaned_representation = postcard::to_stdvec(&secondary_cleaned)?;
     assert_eq!(
         initial_json_cleaned_representation,
         secondary_json_cleaned_representation

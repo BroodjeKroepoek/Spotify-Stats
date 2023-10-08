@@ -81,13 +81,13 @@ struct MyCLI {
     command: MyCliCommand,
 }
 
-const JSON_DATA_PATH: &str = "spotify_stats.json";
+const JSON_DATA_PATH: &str = "spotify_stats.bin";
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args = MyCLI::parse();
     let streaming_data = match FoldedStreamingData::load(JSON_DATA_PATH) {
         Ok(streaming_data) => streaming_data,
-        Err(err) => match args.data {
+        Err(_err) => match args.data {
             Some(path) => {
                 let raw_streaming_data: RawStreamingData = RawStreamingData::from_path(&path)?;
                 let streaming_data = FoldedStreamingData::from(raw_streaming_data);
@@ -95,7 +95,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                 streaming_data
             }
             None => {
-                debug_assert_eq!(err.kind(), std::io::ErrorKind::NotFound);
                 panic!("the '--data <DATA>' argument was not provided, required on first run.");
             }
         },

@@ -15,8 +15,8 @@ bevy = "0.11.3"
 chrono = { version = "0.4.31", features = ["serde"] }
 clap = { version = "4.4.6", features = ["derive"] }
 comfy-table = "7.0.1"
+postcard = { version = "1.0.8", features = ["use-std"] }
 serde = { version = "1.0.188", features = ["derive"] }
-serde_json = { version = "1.0.107", features = ["preserve_order"] }
 
 [lib]
 path = "src/lib/mod.rs"

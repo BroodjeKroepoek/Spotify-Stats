@@ -4,5 +4,6 @@
 /test_full_data
 /assets
 spotify_stats.json
+spotify_stats.bin
 .vscode
 out.txt

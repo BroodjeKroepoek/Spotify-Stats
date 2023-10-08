@@ -144,9 +144,7 @@ pub struct CleanedSpotifyEntry {
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CleanedStreamingData(pub Vec<CleanedSpotifyEntry>);
 
-impl Persist for CleanedStreamingData {
-    type Error = std::io::Error;
-}
+impl Persist for CleanedStreamingData {}
 
 impl From<FoldedStreamingData> for CleanedStreamingData {
     fn from(value: FoldedStreamingData) -> Self {
@@ -181,6 +179,4 @@ impl From<RawStreamingData> for FoldedStreamingData {
     }
 }
 
-impl Persist for FoldedStreamingData {
-    type Error = std::io::Error;
-}
+impl Persist for FoldedStreamingData {}

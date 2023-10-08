@@ -1,4 +1,5 @@
 use std::{
+    error::Error,
     fs::{read_dir, read_to_string},
     path::Path,
 };
@@ -7,8 +8,7 @@ use chrono::{Duration, NaiveDateTime};
 use serde::{Deserialize, Serialize};
 
 use crate::serde::{
-    deserialization::{duration_deserialization, naive_date_time_deserialization},
-    serialization::{duration_serialization, naive_date_time_serialization},
+    deserialization::{duration_deserialization, naive_date_time_deserialization}, serialization::{duration_serialization, naive_date_time_serialization},
 };
 
 use super::Persist;
@@ -79,20 +79,18 @@ pub struct SpotifyEntry {
 pub struct RawStreamingData(pub Vec<SpotifyEntry>);
 
 impl RawStreamingData {
-    pub fn from_path<P>(path: P) -> Result<RawStreamingData, std::io::Error>
+    pub fn from_path<P>(path: P) -> Result<RawStreamingData, Box<dyn Error>>
     where
         P: AsRef<Path>,
     {
         let mut accumulator = RawStreamingData(Vec::new());
         for file in read_dir(path)? {
             let file_content = read_to_string(file?.path())?;
-            let entries: RawStreamingData = serde_json::from_str(&file_content)?;
+            let entries: RawStreamingData = postcard::from_bytes(&file_content.as_bytes())?;
             accumulator.0.extend(entries.0);
         }
         Ok(accumulator)
     }
 }
 
-impl Persist for RawStreamingData {
-    type Error = std::io::Error;
-}
+impl Persist for RawStreamingData {}

@@ -39,3 +39,8 @@ spotify-stats --help
 - [x] Can API calls also supply us with streaming data? -> Not really.
 - [ ] Add case insensitivity to searching, and maybe Levenshtein distance, so making small spelling errors is allowed.
 - [ ] Add benchmarks for persistence?
+
+## Keep in Mind
+
+- [ ] <https://crates.io/crates/mdbook-autosummary>
+- [ ] <https://crates.io/crates/rubedo>
