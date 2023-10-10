@@ -10,7 +10,6 @@ use bevy::{
 };
 use clap::{Parser, Subcommand};
 use comfy_table::{presets::ASCII_MARKDOWN, Table};
-
 use spotify_stats::{
     gui::setup,
     iterate_nested_map,

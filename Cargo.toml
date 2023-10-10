@@ -16,6 +16,7 @@ chrono = { version = "0.4.31", features = ["serde"] }
 clap = { version = "4.4.6", features = ["derive"] }
 comfy-table = "7.0.1"
 postcard = { version = "1.0.8", features = ["use-std"] }
+postcard-derive = "0.1.1"
 serde = { version = "1.0.188", features = ["derive"] }
 
 [lib]

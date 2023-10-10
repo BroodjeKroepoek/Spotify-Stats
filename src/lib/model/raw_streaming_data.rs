@@ -8,7 +8,8 @@ use chrono::{Duration, NaiveDateTime};
 use serde::{Deserialize, Serialize};
 
 use crate::serde::{
-    deserialization::{duration_deserialization, naive_date_time_deserialization}, serialization::{duration_serialization, naive_date_time_serialization},
+    deserialization::{duration_deserialization, naive_date_time_deserialization},
+    serialization::{duration_serialization, naive_date_time_serialization},
 };
 
 use super::Persist;
