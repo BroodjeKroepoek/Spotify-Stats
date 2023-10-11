@@ -10,6 +10,7 @@ use bevy::{
 };
 use clap::{Parser, Subcommand};
 use comfy_table::{presets::ASCII_MARKDOWN, Table};
+
 use spotify_stats::{
     gui::setup,
     iterate_nested_map,
@@ -84,17 +85,21 @@ const JSON_DATA_PATH: &str = "spotify_stats.bin";
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args = MyCLI::parse();
-    let streaming_data = match FoldedStreamingData::load(JSON_DATA_PATH) {
+    let streaming_data = match FoldedStreamingData::load_from_file(JSON_DATA_PATH) {
         Ok(streaming_data) => streaming_data,
-        Err(_err) => match args.data {
+        Err(err) => match args.data {
             Some(path) => {
-                let raw_streaming_data: RawStreamingData = RawStreamingData::from_path(&path)?;
+                let raw_streaming_data: RawStreamingData =
+                    RawStreamingData::from_folder_of_json(&path)?;
                 let streaming_data = FoldedStreamingData::from(raw_streaming_data);
-                streaming_data.save(JSON_DATA_PATH)?;
+                streaming_data.save_to_file(JSON_DATA_PATH)?;
                 streaming_data
             }
             None => {
-                panic!("the '--data <DATA>' argument was not provided, required on first run.");
+                panic!(
+                    "the '--data <DATA>' argument was not provided, required on first run: {}",
+                    err
+                );
             }
         },
     };

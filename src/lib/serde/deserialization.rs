@@ -6,8 +6,8 @@ pub fn naive_date_time_deserialization<'de, D>(deserializer: D) -> Result<NaiveD
 where
     D: de::Deserializer<'de>,
 {
-    let s: &str = Deserialize::deserialize(deserializer)?;
-    NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%SZ").map_err(|parse_error| {
+    let s: String = Deserialize::deserialize(deserializer)?;
+    NaiveDateTime::parse_from_str(&s, "%Y-%m-%dT%H:%M:%SZ").map_err(|parse_error| {
         let custom_error_msg = format!("Failed to parse NaiveDateTime: {}", parse_error);
         de::Error::custom(custom_error_msg)
     })

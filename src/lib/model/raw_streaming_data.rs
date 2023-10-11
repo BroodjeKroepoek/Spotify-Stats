@@ -1,6 +1,6 @@
 use std::{
     error::Error,
-    fs::{read_dir, read_to_string},
+    fs::{self, read_dir},
     path::Path,
 };
 
@@ -80,14 +80,14 @@ pub struct SpotifyEntry {
 pub struct RawStreamingData(pub Vec<SpotifyEntry>);
 
 impl RawStreamingData {
-    pub fn from_path<P>(path: P) -> Result<RawStreamingData, Box<dyn Error>>
+    pub fn from_folder_of_json<P>(path: P) -> Result<RawStreamingData, Box<dyn Error>>
     where
         P: AsRef<Path>,
     {
         let mut accumulator = RawStreamingData(Vec::new());
         for file in read_dir(path)? {
-            let file_content = read_to_string(file?.path())?;
-            let entries: RawStreamingData = postcard::from_bytes(&file_content.as_bytes())?;
+            let content = fs::read_to_string(file?.path())?;
+            let entries: RawStreamingData = serde_json::from_str(&content)?;
             accumulator.0.extend(entries.0);
         }
         Ok(accumulator)
