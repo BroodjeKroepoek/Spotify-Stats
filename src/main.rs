@@ -73,6 +73,9 @@ struct MyCLI {
     /// Show only entries from this album, or matching other queries provided.
     #[arg(long)]
     album: Option<String>,
+    /// Use compression for the database.
+    #[arg(short, long)]
+    compression: bool,
     /// Show only entries of this track, or matching other queries provided.
     #[arg(long)]
     track: Option<String>,
@@ -92,7 +95,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 let raw_streaming_data: RawStreamingData =
                     RawStreamingData::from_folder_of_json(&path)?;
                 let streaming_data = FoldedStreamingData::from(raw_streaming_data);
-                streaming_data.save_to_file(JSON_DATA_PATH)?;
+                streaming_data.save_to_file(JSON_DATA_PATH, args.compression)?;
                 streaming_data
             }
             None => {

@@ -74,7 +74,8 @@ fn test_persist_folded_streaming_data() -> Result<(), Box<dyn Error>> {
     let initial_entries = RawStreamingData::from_folder_of_json(DATA_FOLDER)?;
     let initial_folded = FoldedStreamingData::from(initial_entries);
 
-    initial_folded.save_to_file(path)?;
+    // TODO: Make load determine by itself if the decompression is needed.
+    initial_folded.save_to_file(path, true)?;
     let secondary_folded = FoldedStreamingData::load_from_file(path)?;
 
     fs::remove_file(path)?;
@@ -127,7 +128,8 @@ fn test_persist_cleaned_streaming_data() -> Result<(), Box<dyn Error>> {
     let initial_folded = FoldedStreamingData::from(initial_entries);
     let initial_cleaned = CleanedStreamingData::from(initial_folded);
 
-    initial_cleaned.save_to_file(path)?;
+    // TODO: Make load determine by itself if the decompression is needed.
+    initial_cleaned.save_to_file(path, true)?;
     let secondary_cleaned = CleanedStreamingData::load_from_file(path)?;
 
     fs::remove_file(path)?;

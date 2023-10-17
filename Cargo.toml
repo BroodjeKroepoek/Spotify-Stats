@@ -15,8 +15,9 @@ bevy = "0.11.3"
 chrono = { version = "0.4.31", features = ["serde"] }
 clap = { version = "4.4.6", features = ["derive"] }
 comfy-table = "7.0.1"
+flate2 = "1.0.28"
 rmp-serde = "1.1.2"
-serde = { version = "1.0.188", features = ["derive"] }
+serde = { version = "1.0.189", features = ["derive"] }
 serde_json = { version = "1.0.107", features = ["preserve_order"] }
 
 [lib]
