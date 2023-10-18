@@ -133,6 +133,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
         MyCliCommand::Sorted { n, file } => {
             let mut counter = 1;
+            // TODO: Is CleanedStreamingData really needed? It is nice to have, but maybe unnecessary for us.
             let mut cleaned_entries = CleanedStreamingData::from(streaming_data);
             cleaned_entries
                 .0
