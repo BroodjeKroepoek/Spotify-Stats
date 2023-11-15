@@ -3,16 +3,10 @@ pub mod tests;
 
 use std::{error::Error, fs::File, io::Write, path::PathBuf};
 
-use belly::prelude::BellyPlugin;
-use bevy::{
-    prelude::{App, Startup},
-    DefaultPlugins,
-};
 use clap::{Parser, Subcommand};
 use comfy_table::{presets::ASCII_MARKDOWN, Table};
 
 use spotify_stats::{
-    gui::setup,
     iterate_nested_map,
     model::{
         raw_streaming_data::RawStreamingData,
@@ -52,10 +46,6 @@ enum MyCliCommand {
         #[arg(short, long)]
         file: Option<PathBuf>,
     },
-    /// Graphical User Interface.
-    ///
-    /// This gives an overview of all the information you would even want to know.
-    Gui,
 }
 
 /// Command Line Interface that can process your Spotify Streaming Data.
@@ -64,7 +54,7 @@ enum MyCliCommand {
 struct MyCLI {
     /// REQUIRED ON FIRST RUN: The folder to extract the Spotify streaming data from.
     ///
-    /// After first run: A JSON file is created relative to this cli, that contains all the data summarized.
+    /// After first run: A binary file is created relative to this cli, that contains all the data summarized.
     #[arg(short, long)]
     data: Option<PathBuf>,
     /// Show only entries with this artist, or matching other queries provided.
@@ -165,13 +155,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             } else {
                 println!("{}", table)
             }
-        }
-        MyCliCommand::Gui => {
-            App::new()
-                .add_plugins(DefaultPlugins)
-                .add_plugins(BellyPlugin)
-                .add_systems(Startup, setup)
-                .run();
         }
     }
     Ok(())

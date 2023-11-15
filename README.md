@@ -40,6 +40,7 @@ spotify-stats --help
 - [ ] Add case insensitivity to searching, and maybe Levenshtein distance, so making small spelling errors is allowed.
 - [ ] Add benchmarks for persistence?
 - [x] Add compression for our database. (Data went down from 62 mb to ~5 mb with our folded data and with compression down to 1.4 mb!)
+- [ ] Separate our persistence-related functionality to a separate crate.
 
 ## Keep in Mind
 

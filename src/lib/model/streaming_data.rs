@@ -12,6 +12,7 @@ use super::{
     Persist,
 };
 
+/// Represents a log entry for a streaming event, including play duration and reasons.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
 pub struct LogEntry(
     #[serde(
@@ -23,10 +24,11 @@ pub struct LogEntry(
     Option<String>, // reason_end
 );
 
+/// Represents a log of streaming events indexed by timestamp.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
 pub struct Log(pub BTreeMap<NaiveDateTime, LogEntry>);
 
-// This should ideally be in 3rd normal form, or 5th normal form.
+/// Represents information related to streaming data, including a log and total playtime.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
 pub struct Information(
     pub Log, // log
@@ -38,12 +40,14 @@ pub struct Information(
     pub Option<String>, // spotify_track_url
 );
 
+/// Represents streaming data in a nested structure, grouped by artist, album, and track.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
 pub struct FoldedStreamingData(
     //           Artist           Album            Track,  Info
     pub BTreeMap<String, BTreeMap<String, BTreeMap<String, Information>>>,
 );
 
+/// A macro to insert data into nested BTreeMaps efficiently.
 #[macro_export]
 macro_rules! insert_nested_map {
     ($map:expr, $k1:expr, $k2:expr, $k3:expr, $v:expr) => {{
@@ -58,6 +62,7 @@ macro_rules! insert_nested_map {
     }};
 }
 
+/// A macro to iterate over nested BTreeMaps efficiently.
 #[macro_export]
 macro_rules! iterate_nested_map {
     ($map:expr, $key1:ident, $key2:ident, $key3:ident, $val:ident, $body:block) => {
@@ -71,6 +76,7 @@ macro_rules! iterate_nested_map {
     };
 }
 
+/// Convert a `SpotifyEntry` into `Information`.
 impl From<&SpotifyEntry> for Information {
     fn from(value: &SpotifyEntry) -> Self {
         let mut log = BTreeMap::new();
@@ -86,6 +92,7 @@ impl From<&SpotifyEntry> for Information {
     }
 }
 
+/// Implement addition and assignment for `Information`.
 impl AddAssign for Information {
     fn add_assign(&mut self, rhs: Self) {
         self.1 = self.1 + rhs.1;
@@ -93,41 +100,7 @@ impl AddAssign for Information {
     }
 }
 
-/// Everything as `SpotifyEntry`, but combining all the stats on a per-track basis
-///
-/// The full uncleaned version, in `raw_streaming_data.rs` looks like:
-///
-/// pub struct SpotifyEntry {
-///     #[serde(
-///         deserialize_with = "naive_date_time_deserialization",
-///         serialize_with = "naive_date_time_serialization"
-///     )]
-///     pub ts: NaiveDateTime,
-///     pub username: Option<String>,
-///     pub platform: Option<String>,
-///     #[serde(
-///         deserialize_with = "duration_deserialization",
-///         serialize_with = "duration_serialization"
-///     )]
-///     pub ms_played: Duration,
-///     pub conn_country: Option<String>,
-///     pub ip_addr_decrypted: Option<String>,
-///     pub user_agent_decrypted: Option<String>,
-///     pub master_metadata_track_name: Option<String>,
-///     pub master_metadata_album_artist_name: Option<String>,
-///     pub master_metadata_album_album_name: Option<String>,
-///     pub spotify_track_uri: Option<String>,
-///     pub episode_name: Option<String>,
-///     pub episode_show_name: Option<String>,
-///     pub spotify_episode_uri: Option<String>,
-///     pub reason_start: Option<String>,
-///     pub reason_end: Option<String>,
-///     pub shuffle: Option<bool>,
-///     pub skipped: Option<bool>,
-///     pub offline: Option<bool>,
-///     pub offline_timestamp: Option<u64>,
-///     pub incognito_mode: Option<bool>,
-/// }
+/// Represents cleaned Spotify entry data, including artist, album, track, playtime, and log.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CleanedSpotifyEntry {
     pub artist: String,
@@ -141,11 +114,13 @@ pub struct CleanedSpotifyEntry {
     pub log: Log,
 }
 
+/// Represents a collection of cleaned Spotify entries.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CleanedStreamingData(pub Vec<CleanedSpotifyEntry>);
 
 impl Persist for CleanedStreamingData {}
 
+/// Convert `FoldedStreamingData` into `CleanedStreamingData`.
 impl From<FoldedStreamingData> for CleanedStreamingData {
     fn from(value: FoldedStreamingData) -> Self {
         let mut accumulator = Vec::new();
@@ -162,6 +137,7 @@ impl From<FoldedStreamingData> for CleanedStreamingData {
     }
 }
 
+/// Convert `RawStreamingData` into `FoldedStreamingData`.
 impl From<RawStreamingData> for FoldedStreamingData {
     fn from(value: RawStreamingData) -> Self {
         let mut accumulator = FoldedStreamingData(BTreeMap::new());
