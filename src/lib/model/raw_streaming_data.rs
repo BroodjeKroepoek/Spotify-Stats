@@ -1,3 +1,7 @@
+//! This module describes our own format that we use in for example persistent storage of data.
+//!
+//! This is so we can filter out irrelevant data, and decrease the footprint of the data, i.e. by using nested maps and DEFLATE compression.
+
 use std::{
     error::Error,
     fs::{self, read_dir},

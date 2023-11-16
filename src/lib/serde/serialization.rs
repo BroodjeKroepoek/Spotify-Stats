@@ -1,3 +1,5 @@
+//! This module describes the serialization process, i.e. saving to persistent files.
+
 use chrono::{Duration, NaiveDateTime};
 use serde::{Serialize, Serializer};
 

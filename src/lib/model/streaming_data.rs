@@ -1,3 +1,7 @@
+//! This module describes the format that Spotify uses.
+//!
+//! This is so we can interact with the Spotify streaming data.
+
 use std::{collections::BTreeMap, ops::AddAssign};
 
 use chrono::{Duration, NaiveDateTime};

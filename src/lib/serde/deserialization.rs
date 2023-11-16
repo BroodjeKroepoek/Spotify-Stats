@@ -1,3 +1,5 @@
+//! This module describes the deserialization process, i.e. loading from persistent files.
+
 use chrono::{Duration, NaiveDateTime};
 
 use serde::{de, Deserialize};

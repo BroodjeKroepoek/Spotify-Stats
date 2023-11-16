@@ -1,3 +1,15 @@
+//! This module describes a persistence trait, that allows use to store data between runs of this executable.\
+//!
+//! This is so we don't have to process the raw Spotify streaming data on every run!
+//!
+//! # raw_streaming_data
+//!
+//! Here we describe the front-end format that Spotify uses.
+//!
+//! # streaming_data
+//!
+//! Here we describe the back-end format that we use.
+
 use std::{
     error::Error,
     fs::File,
