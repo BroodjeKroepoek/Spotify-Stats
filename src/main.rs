@@ -1,3 +1,5 @@
+//! Here we describe the main control flow of the CLI, and all the commands and arguments.
+
 #[cfg(test)]
 pub mod tests;
 
@@ -98,9 +100,9 @@ where
 {
     if let Some(path) = file {
         let mut handle = File::create(path)?;
-        writeln!(handle, "{:?}", output)?;
+        writeln!(handle, "{:#?}", output)?;
     } else {
-        println!("{:?}", output)
+        println!("{:#?}", output)
     }
     Ok(())
 }
