@@ -75,7 +75,7 @@ fn test_persist_folded_streaming_data() -> Result<(), Box<dyn Error>> {
     let initial_folded = FoldedStreamingData::from(initial_entries);
 
     // TODO: Make load determine by itself if the decompression is needed.
-    initial_folded.save_to_file(path, true)?;
+    initial_folded.save_to_file(path)?;
     let secondary_folded = FoldedStreamingData::load_from_file(path)?;
 
     fs::remove_file(path)?;
@@ -129,7 +129,7 @@ fn test_persist_cleaned_streaming_data() -> Result<(), Box<dyn Error>> {
     let initial_cleaned = CleanedStreamingData::from(initial_folded);
 
     // TODO: Make load determine by itself if the decompression is needed.
-    initial_cleaned.save_to_file(path, true)?;
+    initial_cleaned.save_to_file(path)?;
     let secondary_cleaned = CleanedStreamingData::load_from_file(path)?;
 
     fs::remove_file(path)?;

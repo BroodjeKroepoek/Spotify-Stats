@@ -18,28 +18,27 @@ pub trait Persist: Serialize + for<'a> Deserialize<'a> + Sized {
     /// # Arguments
     ///
     /// - `key`: The path to the file where the object will be saved.
-    /// - `use_compression`: A flag indicating whether to apply DEFLATE compression.
     ///
     /// # Returns
     ///
     /// Returns `Result` with `()` on success or a `Box<dyn Error>` on failure.
-    fn save_to_file<P>(&self, key: P, use_compression: bool) -> Result<(), Box<dyn Error>>
+    fn save_to_file<P>(&self, key: P) -> Result<(), Box<dyn Error>>
     where
         P: AsRef<Path>,
     {
-        let mut handle = File::create(key)?;
+        // Serialize the object
         let mut bytes = Vec::with_capacity(128);
         let mut serializer: Serializer<&mut Vec<u8>> = Serializer::new(bytes.as_mut());
         self.serialize(&mut serializer)?;
-        if use_compression {
-            let mut encoder = DeflateEncoder::new(Vec::new(), Compression::best());
-            encoder.write_all(&bytes)?;
-            handle.write_all(&encoder.finish()?)?;
-            Ok(())
-        } else {
-            handle.write_all(&bytes)?;
-            Ok(())
-        }
+
+        // Apply DEFLATE compression
+        let mut encoder = DeflateEncoder::new(Vec::new(), Compression::best());
+        encoder.write_all(&bytes)?;
+
+        // Write the compressed data to the file
+        let mut handle = File::create(key)?;
+        handle.write_all(&encoder.finish()?)?;
+        Ok(())
     }
 
     /// Loads an object from a file.
@@ -55,17 +54,13 @@ pub trait Persist: Serialize + for<'a> Deserialize<'a> + Sized {
     where
         P: AsRef<Path>,
     {
+        // Read the compressed data from the file
         let mut handle = File::open(key)?;
         let mut decoder = DeflateDecoder::new(&mut handle);
         let mut bytes = Vec::new();
-        let mut buf = Vec::new();
-        let bytes = match decoder.read_to_end(&mut bytes) {
-            Ok(_) => bytes,
-            Err(_) => {
-                handle.read_to_end(&mut buf)?;
-                buf
-            }
-        };
+        decoder.read_to_end(&mut bytes)?;
+
+        // Deserialize the object
         let mut deserializer: Deserializer<ReadReader<&[u8]>> = Deserializer::new(&bytes);
         Ok(Self::deserialize(&mut deserializer)?)
     }
@@ -83,6 +78,7 @@ pub trait Persist: Serialize + for<'a> Deserialize<'a> + Sized {
     where
         R: Read,
     {
+        // Deserialize the object from the reader
         let mut deserializer = Deserializer::new(reader);
         Ok(Self::deserialize(&mut deserializer)?)
     }
@@ -100,6 +96,7 @@ pub trait Persist: Serialize + for<'a> Deserialize<'a> + Sized {
     where
         W: Write,
     {
+        // Serialize the object to the writer
         let mut serializer = Serializer::new(writer);
         self.serialize(&mut serializer)?;
         Ok(())
@@ -111,6 +108,7 @@ pub trait Persist: Serialize + for<'a> Deserialize<'a> + Sized {
     ///
     /// Returns the byte vector containing the serialized object on success or a `Box<dyn Error>` on failure.
     fn to_bytes(&self) -> Result<Vec<u8>, Box<dyn Error>> {
+        // Serialize the object to a byte vector
         let mut out = Vec::with_capacity(128);
         let mut serializer: Serializer<&mut Vec<u8>> = Serializer::new(out.as_mut());
         self.serialize(&mut serializer)?;
@@ -127,6 +125,7 @@ pub trait Persist: Serialize + for<'a> Deserialize<'a> + Sized {
     ///
     /// Returns the deserialized object on success or a `Box<dyn Error>` on failure.
     fn from_bytes(bytes: &[u8]) -> Result<Self, Box<dyn Error>> {
+        // Deserialize the object from the byte slice
         let mut deserializer = Deserializer::new(bytes);
         Ok(Self::deserialize(&mut deserializer)?)
     }

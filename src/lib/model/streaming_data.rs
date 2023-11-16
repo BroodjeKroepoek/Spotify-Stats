@@ -15,35 +15,77 @@ use super::{
 /// Represents a log entry for a streaming event, including play duration and reasons.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
 pub struct LogEntry(
+    /// Duration of the music track played.
     #[serde(
         deserialize_with = "duration_deserialization",
         serialize_with = "duration_serialization"
     )]
-    Duration, // ms_played
-    Option<String>, // reason_start
-    Option<String>, // reason_end
+    pub Duration, // ms_played
+    /// The reason for starting playback (e.g., "trackdone").
+    pub Option<String>, // reason_start
+    /// The reason for ending playback (e.g., "trackdone").
+    pub Option<String>, // reason_end
 );
 
 /// Represents a log of streaming events indexed by timestamp.
+///
+/// # Examples
+///
+/// ```rust
+/// use spotify_stats::model::streaming_data::{Log, LogEntry};
+/// use chrono::{NaiveDateTime, Duration};
+/// use std::collections::BTreeMap;
+///
+/// let mut log_map = BTreeMap::new();
+/// log_map.insert(
+///     NaiveDateTime::parse_from_str("2013-05-03T16:35:29Z", "%Y-%m-%dT%H:%M:%SZ").unwrap(),
+///     LogEntry(
+///         Duration::seconds(180),
+///         Some("trackstart".to_string()),
+///         Some("trackdone".to_string()),
+///     ),
+/// );
+/// let log = Log(log_map);
+/// ```
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
-pub struct Log(pub BTreeMap<NaiveDateTime, LogEntry>);
+pub struct Log(
+    /// A BTreeMap where the key is the timestamp and the value is a `LogEntry`.
+    pub BTreeMap<NaiveDateTime, LogEntry>,
+);
 
 /// Represents information related to streaming data, including a log and total playtime.
+///
+/// # Examples
+///
+/// ```rust
+/// use spotify_stats::model::streaming_data::{Log, Information};
+/// use std::collections::BTreeMap;
+/// use chrono::Duration;
+///
+/// let information = Information(
+///     Log(BTreeMap::new()), // Empty log for illustration purposes
+///     Duration::milliseconds(180),
+///     Some("spotify:track:example_uri".to_string()),
+/// );
+/// ```
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
 pub struct Information(
+    /// Log of streaming events indexed by timestamp.
     pub Log, // log
+    /// Total duration of all music tracks played.
     #[serde(
         deserialize_with = "duration_deserialization",
         serialize_with = "duration_serialization"
     )]
     pub Duration, // total_ms_played
+    /// Spotify track URL associated with the streaming data.
     pub Option<String>, // spotify_track_url
 );
 
 /// Represents streaming data in a nested structure, grouped by artist, album, and track.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
 pub struct FoldedStreamingData(
-    //           Artist           Album            Track,  Info
+    /// A BTreeMap with nested structures representing artist, album, track, and information.
     pub BTreeMap<String, BTreeMap<String, BTreeMap<String, Information>>>,
 );
 
@@ -103,20 +145,28 @@ impl AddAssign for Information {
 /// Represents cleaned Spotify entry data, including artist, album, track, playtime, and log.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CleanedSpotifyEntry {
+    /// Artist name associated with the played track.
     pub artist: String,
+    /// Album name associated with the played track.
     pub album: String,
+    /// Track name.
     pub track: String,
+    /// Total duration of the music track played.
     #[serde(
         deserialize_with = "duration_deserialization",
         serialize_with = "duration_serialization"
     )]
     pub total_ms_played: Duration,
+    /// Log of streaming events indexed by timestamp.
     pub log: Log,
 }
 
 /// Represents a collection of cleaned Spotify entries.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
-pub struct CleanedStreamingData(pub Vec<CleanedSpotifyEntry>);
+pub struct CleanedStreamingData(
+    /// A vector containing cleaned Spotify entry objects.
+    pub Vec<CleanedSpotifyEntry>,
+);
 
 impl Persist for CleanedStreamingData {}
 
