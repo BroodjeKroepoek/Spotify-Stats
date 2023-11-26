@@ -25,7 +25,9 @@ use spotify_stats::{
 
 #[derive(Debug, Clone, Subcommand)]
 enum Mode {
+    /// Displays the debug formatting of the internal data used by this executable.
     Rust,
+    /// Displays the internal data used by this executable in JSON format.
     JSON,
 }
 
@@ -67,7 +69,7 @@ enum MyCliCommand {
         #[command(subcommand)]
         format: Format,
     },
-    /// Use raw format.
+    /// Display the streaming data using the raw internal data format.
     ///
     /// Either using the internal Rust representation or formatting as JSON data.
     ///
@@ -106,9 +108,9 @@ where
 {
     if let Some(path) = file {
         let mut handle = File::create(path)?;
-        writeln!(handle, "{:#?}", output)?;
+        writeln!(handle, "{:?}", output)?;
     } else {
-        println!("{:#?}", output)
+        println!("{:?}", output)
     }
     Ok(())
 }
@@ -157,7 +159,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         MyCliCommand::Raw { file, mode } => match mode {
             Mode::Rust => deligate_output_debug(file, streaming_data)?,
             Mode::JSON => {
-                let string = serde_json::to_string_pretty(&streaming_data)?;
+                let string = serde_json::to_string(&streaming_data)?;
                 deligate_output_display(file, string)?;
             }
         },
