@@ -8,16 +8,17 @@ Go to the website <https://www.spotify.com/us/account/privacy/> and click on "Re
 
 ## Quick Start
 
-*First time running*: supply the '--data \<DATA\>' argument. This will print everything to stdout.
+*First time running*: supply the '--data \<DATA\>' argument.
+The executable expects of folder of one or more JSON files, that is expected to use the Spotify format described in `SpotifyEntry` and `RawStreamingData` in [raw_streaming_data.rs](src/lib/model/raw_streaming_data.rs)
 
 ```ps
-spotify-stats --data .\data\
+spotify-stats --data .\data_folder
 ```
 
 After that try searching via '--artist \<ARTIST\>' or '--track \<TRACK\>'.
 
 ```ps
-spotify-stats --artist "Lizzo"
+spotify-stats --artist "Lizzo" pretty
 ```
 
 See help or the long help, by using '-h' or '--help' respectively.

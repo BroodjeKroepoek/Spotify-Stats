@@ -3,7 +3,13 @@
 #[cfg(test)]
 pub mod tests;
 
-use std::{error::Error, fmt::Debug, fs::File, io::Write, path::PathBuf};
+use std::{
+    error::Error,
+    fmt::{Debug, Display},
+    fs::File,
+    io::Write,
+    path::PathBuf,
+};
 
 use clap::{command, Parser, Subcommand};
 use comfy_table::{presets::ASCII_MARKDOWN, Table};
@@ -21,11 +27,13 @@ enum Mode {
 }
 
 #[derive(Debug, Clone, Subcommand)]
-enum Sorted {
+enum Format {
     /// Only the top most played, or when passing the `reversed` flag the top least played.
     Sorted {
+        /// Display the `top <COUNT>` entries.
         #[arg(short, long)]
         count: Option<usize>,
+        /// Reverse the sorting, i.e. displaying the `top least` played songs.
         #[arg(short, long)]
         reversed: bool,
     },
@@ -33,7 +41,7 @@ enum Sorted {
 
 #[derive(Debug, Clone, Subcommand)]
 enum MyCliCommand {
-    /// Use a pretty and readable format in a table.
+    /// Display the streaming data using a pretty and readable format in a table.
     ///
     /// It's possible to only show entries that match your search query, i.e. by specific `artist`, `album` or `track` name.
     /// Everything is in lexicographical ordering.
@@ -41,14 +49,18 @@ enum MyCliCommand {
         /// Redirect output to a file, with the given path.
         #[arg(short, long)]
         file: Option<PathBuf>,
-        /// Use a pretty and readable format but in sorted order according to `Duration` played.
-        ///
-        /// It's possible to only show entries that match your search query.
-        /// Everything is in sorted order, according to the last column `Duration`.
-        ///
-        /// NOTE: If you pass in 0, it will give back everything in sorted order, not only the `top <SORTED>` entries.
+        /// Only show entries that match this artist name, and/or matching other search queries.
+        #[arg(long)]
+        artist: Option<String>,
+        /// Only show entries that match this album name, and/or matching other search queries.
+        #[arg(long)]
+        album: Option<String>,
+        /// Only show entries that match this track name, and/or matching other search queries.
+        #[arg(long)]
+        track: Option<String>,
+        /// Specify a specify format to use.
         #[command(subcommand)]
-        sorted: Option<Sorted>,
+        format: Format,
     },
     /// Use raw format.
     ///
@@ -57,10 +69,10 @@ enum MyCliCommand {
     /// It's possible to only show data that matches your search query.
     /// The raw data is a nested map: `artist->album->track->[info entries]*`.
     Raw {
-        /// Redirect output to a file.
+        /// Redirect output to a file, with the given path.
         #[arg(short, long)]
         file: Option<PathBuf>,
-        /// Mode
+        /// Which raw mode to use: `Rust` or `JSON`.
         #[command(subcommand)]
         mode: Mode,
     },
@@ -74,27 +86,16 @@ enum MyCliCommand {
 struct MyCLI {
     /// REQUIRED ON FIRST RUN: The folder to extract the Spotify streaming data from.
     ///
-    /// After first run: A binary file is created relative to this executable, that contains all the relevant data summarized.
+    /// After first run: a persistent binary file is created relative to this executable, that contains all the relevant data compressed.
+    /// This executable first tries to find this file, and if it is not present only then will an error be displayed, asking you to provide this folder.
     #[arg(short, long)]
     data: Option<PathBuf>,
-    /// Show only entries with this artist, or matching other queries provided.
-    #[arg(long)]
-    artist: Option<String>,
-    /// Show only entries from this album, or matching other queries provided.
-    #[arg(long)]
-    album: Option<String>,
-    /// Use compression for the database.
-    #[arg(short, long)]
-    compression: bool,
-    /// Show only entries of this track, or matching other queries provided.
-    #[arg(long)]
-    track: Option<String>,
     /// The format to use when presenting the results to the user.
     #[command(subcommand)]
     command: MyCliCommand,
 }
 
-fn deligate_output<T>(file: Option<PathBuf>, output: T) -> Result<(), Box<dyn Error>>
+fn deligate_output_debug<T>(file: Option<PathBuf>, output: T) -> Result<(), Box<dyn Error>>
 where
     T: Debug,
 {
@@ -103,6 +104,19 @@ where
         writeln!(handle, "{:#?}", output)?;
     } else {
         println!("{:#?}", output)
+    }
+    Ok(())
+}
+
+fn deligate_output_display<T>(file: Option<PathBuf>, output: T) -> Result<(), Box<dyn Error>>
+where
+    T: Display,
+{
+    if let Some(path) = file {
+        let mut handle = File::create(path)?;
+        writeln!(handle, "{}", output)?;
+    } else {
+        println!("{}", output)
     }
     Ok(())
 }
@@ -135,52 +149,57 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Step 3: Match on parsed command line arguments and subcommands.
     match args.command {
-        MyCliCommand::Raw { file, mode: _ } => deligate_output(file, streaming_data)?,
-        MyCliCommand::Pretty { file: _, sorted } => {
+        MyCliCommand::Raw { file, mode } => match mode {
+            Mode::Rust => deligate_output_debug(file, streaming_data)?,
+            Mode::JSON => {
+                let string = serde_json::to_string_pretty(&streaming_data)?;
+                deligate_output_display(file, string)?;
+            }
+        },
+        MyCliCommand::Pretty {
+            file,
+            format,
+            artist,
+            album,
+            track,
+        } => {
             let mut table = Table::new();
-            if let Some(sorted) = sorted {
-                match sorted {
-                    Sorted::Sorted { count, reversed } => {
-                        let mut counter = 1;
-                        // TODO: Is CleanedStreamingData really needed? It is nice to have, but maybe unnecessary for us.
-                        let mut cleaned_entries = CleanedStreamingData::from(streaming_data);
-                        if !reversed {
-                            cleaned_entries.0.sort_by(|a, b| {
-                                a.total_ms_played.cmp(&b.total_ms_played).reverse()
-                            });
-                        } else {
-                            cleaned_entries
-                                .0
-                                .sort_by(|a, b| a.total_ms_played.cmp(&b.total_ms_played));
-                        }
-                        table.load_preset(ASCII_MARKDOWN);
-                        table.set_header(["Rank", "Artist", "Album", "Track", "Duration (ms)"]);
-                        for cleaned_entry in cleaned_entries.0 {
-                            if (Some(&cleaned_entry.artist) == args.artist.as_ref()
-                                || Some(&cleaned_entry.album) == args.album.as_ref()
-                                || Some(&cleaned_entry.track) == args.track.as_ref())
-                                ^ (args.artist.is_none()
-                                    && args.album.is_none()
-                                    && args.track.is_none())
-                            {
-                                if counter <= count.unwrap_or_default() {
-                                    table.add_row([
-                                        counter.to_string(),
-                                        cleaned_entry.artist.clone(),
-                                        cleaned_entry.album.clone(),
-                                        cleaned_entry.track.clone(),
-                                        cleaned_entry
-                                            .total_ms_played
-                                            .num_milliseconds()
-                                            .to_string(),
-                                    ]);
-                                    counter += 1;
-                                }
+            table.load_preset(ASCII_MARKDOWN);
+            match format {
+                Format::Sorted { count, reversed } => {
+                    let mut counter = 1;
+                    let mut cleaned_entries = CleanedStreamingData::from(streaming_data);
+                    if !reversed {
+                        cleaned_entries
+                            .0
+                            .sort_by(|a, b| a.total_ms_played.cmp(&b.total_ms_played).reverse());
+                    } else {
+                        cleaned_entries
+                            .0
+                            .sort_by(|a, b| a.total_ms_played.cmp(&b.total_ms_played));
+                    }
+                    table.set_header(["Rank", "Artist", "Album", "Track", "Duration (ms)"]);
+                    for cleaned_entry in cleaned_entries.0 {
+                        if (Some(&cleaned_entry.artist) == artist.as_ref()
+                            || Some(&cleaned_entry.album) == album.as_ref()
+                            || Some(&cleaned_entry.track) == track.as_ref())
+                            ^ (artist.is_none() && album.is_none() && track.is_none())
+                        {
+                            if counter <= count.unwrap_or_default() || count.is_none() {
+                                table.add_row([
+                                    counter.to_string(),
+                                    cleaned_entry.artist.clone(),
+                                    cleaned_entry.album.clone(),
+                                    cleaned_entry.track.clone(),
+                                    cleaned_entry.total_ms_played.num_milliseconds().to_string(),
+                                ]);
+                                counter += 1;
                             }
                         }
                     }
                 }
             }
+            deligate_output_display(file, table)?;
         }
     }
     Ok(())
