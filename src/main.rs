@@ -102,6 +102,7 @@ struct MyCLI {
     command: MyCliCommand,
 }
 
+#[inline(always)]
 fn deligate_output_debug<T>(file: Option<PathBuf>, output: T) -> Result<(), Box<dyn Error>>
 where
     T: Debug,
@@ -115,6 +116,7 @@ where
     Ok(())
 }
 
+#[inline(always)]
 fn deligate_output_display<T>(file: Option<PathBuf>, output: T) -> Result<(), Box<dyn Error>>
 where
     T: Display,

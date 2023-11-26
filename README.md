@@ -6,6 +6,25 @@ Command Line Interface that can process your Spotify Streaming Data.
 
 Go to the website <https://www.spotify.com/us/account/privacy/> and click on "Request Data", make sure to include streaming data.
 
+## Overview
+
+```txt
+Command Line Interface that can process your Spotify Streaming Data
+
+Usage: spotify_stats.exe [OPTIONS] <COMMAND>
+
+Commands:
+  table  Display the streaming data using a pretty and readable format in a table
+  raw    Display the streaming data using the raw internal data format
+  help   Print this message or the help of the given subcommand(s)
+
+Options:
+  -d, --data <DATA>  REQUIRED ON FIRST RUN: The folder to extract the Spotify streaming da
+ta from
+  -h, --help         Print help (see more with '--help')
+  -V, --version      Print version
+```
+
 ## Quick Start
 
 *First time running*: supply the '--data \<DATA\>' argument.
