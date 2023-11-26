@@ -14,10 +14,13 @@ use std::{
 use clap::{command, Parser, Subcommand};
 use comfy_table::{presets::ASCII_MARKDOWN, Table};
 
-use spotify_stats::model::{
-    raw_streaming_data::RawStreamingData,
-    streaming_data::{CleanedStreamingData, FoldedStreamingData},
-    Persist,
+use spotify_stats::{
+    iterate_nested_map,
+    model::{
+        raw_streaming_data::RawStreamingData,
+        streaming_data::{CleanedStreamingData, FoldedStreamingData},
+        Persist,
+    },
 };
 
 #[derive(Debug, Clone, Subcommand)]
@@ -37,6 +40,8 @@ enum Format {
         #[arg(short, long)]
         reversed: bool,
     },
+    /// Don't sort use default lexicographical ordering.
+    Lexicographical,
 }
 
 #[derive(Debug, Clone, Subcommand)]
@@ -45,7 +50,7 @@ enum MyCliCommand {
     ///
     /// It's possible to only show entries that match your search query, i.e. by specific `artist`, `album` or `track` name.
     /// Everything is in lexicographical ordering.
-    Pretty {
+    Table {
         /// Redirect output to a file, with the given path.
         #[arg(short, long)]
         file: Option<PathBuf>,
@@ -156,7 +161,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 deligate_output_display(file, string)?;
             }
         },
-        MyCliCommand::Pretty {
+        MyCliCommand::Table {
             file,
             format,
             artist,
@@ -197,6 +202,18 @@ fn main() -> Result<(), Box<dyn Error>> {
                             }
                         }
                     }
+                }
+                Format::Lexicographical => {
+                    table.set_header(["Artist", "Album", "Track", "Duration (ms)"]);
+                    iterate_nested_map!(streaming_data, artist, album, track, info, {
+                        let duration = info.1;
+                        table.add_row([
+                            format!("{artist}"),
+                            format!("{album}"),
+                            format!("{track}"),
+                            format!("{duration}"),
+                        ]);
+                    });
                 }
             }
             deligate_output_display(file, table)?;
