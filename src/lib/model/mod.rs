@@ -11,6 +11,7 @@
 //! Here we describe the back-end format that we use.
 
 use std::{
+    collections::BTreeMap,
     error::Error,
     fs::File,
     io::{Read, Write},
@@ -77,57 +78,27 @@ pub trait Persist: Serialize + for<'a> Deserialize<'a> + Sized {
         Ok(Self::deserialize(&mut deserializer)?)
     }
 
-    /// Loads an object from a provided reader.
-    ///
-    /// # Arguments
-    ///
-    /// - `reader`: The reader from which the object will be loaded.
-    ///
-    /// # Returns
-    ///
-    /// Returns the loaded object on success or a `Box<dyn Error>` on failure.
-    fn load_from_reader<R>(reader: R) -> Result<Self, Box<dyn Error>>
-    where
-        R: Read,
-    {
-        // Deserialize the object from the reader
-        let mut deserializer = Deserializer::new(reader);
-        Ok(Self::deserialize(&mut deserializer)?)
-    }
-
-    /// Saves the implementing object to a writer.
-    ///
-    /// # Arguments
-    ///
-    /// - `writer`: The writer to which the object will be saved.
-    ///
-    /// # Returns
-    ///
-    /// Returns `Result` with `()` on success or a `Box<dyn Error>` on failure.
-    fn save_to_writer<W>(&self, writer: W) -> Result<(), Box<dyn Error>>
-    where
-        W: Write,
-    {
-        // Serialize the object to the writer
-        let mut serializer = Serializer::new(writer);
-        self.serialize(&mut serializer)?;
-        Ok(())
-    }
-
-    /// Serializes the implementing object to a byte vector.
+    /// Serializes the implementing object to a compressed byte vector.
+    /// Note: allows for extending other datastructures with this one.
     ///
     /// # Returns
     ///
     /// Returns the byte vector containing the serialized object on success or a `Box<dyn Error>` on failure.
     fn to_bytes(&self) -> Result<Vec<u8>, Box<dyn Error>> {
         // Serialize the object to a byte vector
-        let mut out = Vec::with_capacity(128);
-        let mut serializer: Serializer<&mut Vec<u8>> = Serializer::new(out.as_mut());
+        let mut bytes = Vec::new();
+        let mut serializer: Serializer<&mut Vec<u8>> = Serializer::new(bytes.as_mut());
         self.serialize(&mut serializer)?;
-        Ok(out)
+
+        // Apply DEFLATE compression to the serialized data
+        let mut encoder = DeflateEncoder::new(Vec::new(), Compression::best());
+        encoder.write_all(&bytes)?;
+
+        Ok(encoder.finish()?)
     }
 
     // Deserializes an object from a byte slice.
+    /// Note: allows for extending other datastructures with this one.
     ///
     /// # Arguments
     ///
@@ -136,9 +107,21 @@ pub trait Persist: Serialize + for<'a> Deserialize<'a> + Sized {
     /// # Returns
     ///
     /// Returns the deserialized object on success or a `Box<dyn Error>` on failure.
-    fn from_bytes(bytes: &[u8]) -> Result<Self, Box<dyn Error>> {
+    fn from_bytes(compressed_bytes: &[u8]) -> Result<Self, Box<dyn Error>> {
+        // Read the compressed bytes
+        let mut bytes = Vec::new();
+        let mut decoder = DeflateDecoder::new(compressed_bytes);
+        decoder.read_to_end(&mut bytes)?;
+
         // Deserialize the object from the byte slice
-        let mut deserializer = Deserializer::new(bytes);
+        let mut deserializer: Deserializer<ReadReader<&[u8]>> = Deserializer::new(bytes.as_mut());
         Ok(Self::deserialize(&mut deserializer)?)
     }
+}
+
+impl<K, V> Persist for BTreeMap<K, V>
+where
+    K: for<'a> Deserialize<'a> + Serialize + Ord,
+    V: for<'a> Deserialize<'a> + Serialize,
+{
 }

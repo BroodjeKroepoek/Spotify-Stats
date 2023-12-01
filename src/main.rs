@@ -29,6 +29,8 @@ enum Mode {
     Rust,
     /// Displays the internal data used by this executable in JSON format.
     JSON,
+    /// Displays the internal data used in raw binary format.
+    Binary,
 }
 
 #[derive(Debug, Clone, Subcommand)]
@@ -163,6 +165,10 @@ fn main() -> Result<(), Box<dyn Error>> {
             Mode::JSON => {
                 let string = serde_json::to_string(&streaming_data)?;
                 deligate_output_display(file, string)?;
+            }
+            Mode::Binary => {
+                let bytes = streaming_data.to_bytes()?;
+                deligate_output_debug(file, bytes)?;
             }
         },
         MyCliCommand::Table {
