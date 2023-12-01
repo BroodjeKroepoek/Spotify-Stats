@@ -11,7 +11,6 @@
 //! Here we describe the back-end format that we use.
 
 use std::{
-    collections::BTreeMap,
     error::Error,
     fs::File,
     io::{Read, Write},
@@ -119,9 +118,4 @@ pub trait Persist: Serialize + for<'a> Deserialize<'a> + Sized {
     }
 }
 
-impl<K, V> Persist for BTreeMap<K, V>
-where
-    K: for<'a> Deserialize<'a> + Serialize + Ord,
-    V: for<'a> Deserialize<'a> + Serialize,
-{
-}
+impl<T: Serialize + for<'a> Deserialize<'a>> Persist for T {}

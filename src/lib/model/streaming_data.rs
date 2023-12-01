@@ -11,10 +11,7 @@ use crate::serde::{
     deserialization::duration_deserialization, serialization::duration_serialization,
 };
 
-use super::{
-    raw_streaming_data::{RawStreamingData, SpotifyEntry},
-    Persist,
-};
+use super::raw_streaming_data::{RawStreamingData, SpotifyEntry};
 
 /// Represents a log entry for a streaming event, including play duration and reasons.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
@@ -172,8 +169,6 @@ pub struct CleanedStreamingData(
     pub Vec<CleanedSpotifyEntry>,
 );
 
-impl Persist for CleanedStreamingData {}
-
 /// Convert `FoldedStreamingData` into `CleanedStreamingData`.
 impl From<FoldedStreamingData> for CleanedStreamingData {
     fn from(value: FoldedStreamingData) -> Self {
@@ -208,5 +203,3 @@ impl From<RawStreamingData> for FoldedStreamingData {
         accumulator
     }
 }
-
-impl Persist for FoldedStreamingData {}

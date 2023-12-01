@@ -203,9 +203,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                             if counter <= count.unwrap_or_default() || count.is_none() {
                                 table.add_row([
                                     counter.to_string(),
-                                    cleaned_entry.artist.clone(),
-                                    cleaned_entry.album.clone(),
-                                    cleaned_entry.track.clone(),
+                                    cleaned_entry.artist,
+                                    cleaned_entry.album,
+                                    cleaned_entry.track,
                                     cleaned_entry.total_ms_played.num_milliseconds().to_string(),
                                 ]);
                                 counter += 1;
@@ -216,16 +216,16 @@ fn main() -> Result<(), Box<dyn Error>> {
                 Format::Lexicographical => {
                     table.set_header(["Artist", "Album", "Track", "Duration (ms)"]);
                     iterate_nested_map!(streaming_data, artist, album, track, info, {
-                        let duration = info.1;
+                        let total_ms_played = info.1;
                         table.add_row([
-                            format!("{artist}"),
-                            format!("{album}"),
-                            format!("{track}"),
-                            format!("{duration}"),
+                            artist,
+                            album,
+                            track,
+                            &total_ms_played.num_milliseconds().to_string(),
                         ]);
                     });
                 }
-            }
+            };
             deligate_output_display(file, table)?;
         }
     }

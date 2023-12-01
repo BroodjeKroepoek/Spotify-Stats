@@ -16,8 +16,6 @@ use crate::serde::{
     serialization::{duration_serialization, naive_date_time_serialization},
 };
 
-use super::Persist;
-
 /// Represents an individual entry in Spotify streaming data.
 ///
 /// A Spotify entry contains details about a user's streaming activity, such as the timestamp, username,
@@ -234,5 +232,3 @@ impl RawStreamingData {
         Ok(accumulator)
     }
 }
-
-impl Persist for RawStreamingData {}
