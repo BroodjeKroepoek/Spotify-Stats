@@ -19,8 +19,7 @@ Commands:
   help   Print this message or the help of the given subcommand(s)
 
 Options:
-  -d, --data <DATA>  REQUIRED ON FIRST RUN: The folder to extract the Spotify streaming da
-ta from
+  -d, --data <DATA>  FIRST RUN: The folder to extract the streaming data from
   -h, --help         Print help (see more with '--help')
   -V, --version      Print version
 ```
