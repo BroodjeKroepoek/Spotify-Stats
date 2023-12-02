@@ -18,6 +18,14 @@ rmp-serde = "1.1.2"
 serde = { version = "1.0.189", features = ["derive"] }
 serde_json = { version = "1.0.107", features = ["preserve_order"] }
 
+[[bin]]
+name = "spotify_stats"
+path = "src/main.rs"
+
+[[bin]]
+name = "readme_gen"
+path = "src/readme_gen.rs"
+
 [lib]
 path = "src/lib/mod.rs"
 
