@@ -45,7 +45,7 @@ enum Format {
         reversed: bool,
     },
     /// Don't sort use default lexicographical ordering.
-    Lexicographical,
+    Lexico,
 }
 
 #[derive(Debug, Clone, Subcommand)]
@@ -95,7 +95,7 @@ enum MyCliCommand {
 struct MyCLI {
     /// REQUIRED ON FIRST RUN: The folder to extract the Spotify streaming data from.
     ///
-    /// After first run: a persistent binary file is created relative to this executable, that contains all the relevant data compressed.
+    /// After first run: a persistent binary file `.\spotify_stats.bin` is created, relative to this executable, that contains all the relevant data compressed.
     /// This executable first tries to find this file, and if it is not present only then will an error be displayed, asking you to provide this folder.
     #[arg(short, long)]
     data: Option<PathBuf>,
@@ -213,7 +213,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                         }
                     }
                 }
-                Format::Lexicographical => {
+                Format::Lexico => {
                     table.set_header(["Artist", "Album", "Track", "Duration (ms)"]);
                     iterate_nested_map!(streaming_data, artist, album, track, info, {
                         let total_ms_played = info.1;
