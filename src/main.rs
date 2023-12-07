@@ -199,17 +199,16 @@ fn main() -> Result<(), Box<dyn Error>> {
                             || Some(&cleaned_entry.album) == album.as_ref()
                             || Some(&cleaned_entry.track) == track.as_ref())
                             ^ (artist.is_none() && album.is_none() && track.is_none())
+                            && (counter <= count.unwrap_or_default() || count.is_none())
                         {
-                            if counter <= count.unwrap_or_default() || count.is_none() {
-                                table.add_row([
-                                    counter.to_string(),
-                                    cleaned_entry.artist,
-                                    cleaned_entry.album,
-                                    cleaned_entry.track,
-                                    cleaned_entry.total_ms_played.num_milliseconds().to_string(),
-                                ]);
-                                counter += 1;
-                            }
+                            table.add_row([
+                                counter.to_string(),
+                                cleaned_entry.artist,
+                                cleaned_entry.album,
+                                cleaned_entry.track,
+                                cleaned_entry.total_ms_played.num_milliseconds().to_string(),
+                            ]);
+                            counter += 1;
                         }
                     }
                 }

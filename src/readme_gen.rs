@@ -1,7 +1,9 @@
 //! Use clap derive macro to automatically also generate the overview section of the README.md
-//! 
+//!
 //! I want to extend this module to add more functionally for generating README automatically.
 //! For example finding all the semver version in the git tags of the repo and link them in a `history` or `releases` section... etc.
+//!
+//! Maybe we don't have to use std::process::Command, maybe we can directly get the help message from the CLI by accessing the struct directly?
 
 use std::{error::Error, fs::File, io::Write as IOWrite, process::Command};
 
@@ -19,6 +21,7 @@ To obtain your own streaming data, go to the website [Spotify Privacy Settings](
 
 ```txt
 "#;
+
     let output = Command::new("cargo")
         .arg("run")
         .arg("-r")
