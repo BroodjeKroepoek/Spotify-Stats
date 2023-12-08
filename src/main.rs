@@ -28,7 +28,7 @@ enum Mode {
     /// Displays the debug formatting of the internal data used by this executable.
     Rust,
     /// Displays the internal data used by this executable in JSON format.
-    JSON,
+    Json,
     /// Displays the internal data used in raw binary format.
     Binary,
 }
@@ -162,7 +162,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     match args.command {
         MyCliCommand::Raw { file, mode } => match mode {
             Mode::Rust => deligate_output_debug(file, streaming_data)?,
-            Mode::JSON => {
+            Mode::Json => {
                 let string = serde_json::to_string(&streaming_data)?;
                 deligate_output_display(file, string)?;
             }
