@@ -143,8 +143,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         Ok(streaming_data) => streaming_data,
         Err(err) => match args.data {
             Some(path) => {
-                let raw_streaming_data: RawStreamingData =
-                    RawStreamingData::from_folder_of_json(&path)?;
+                let raw_streaming_data = match RawStreamingData::from_folder_of_json(&path) {
+                    Ok(raw_streaming_data) => raw_streaming_data,
+                    Err(err) => {
+                        panic!("`spotify_stats.bin` is corrupted, exited with this error: {err}")
+                    }
+                };
                 let streaming_data = FoldedStreamingData::from(raw_streaming_data);
                 streaming_data.save_to_file(JSON_DATA_PATH)?;
                 streaming_data
