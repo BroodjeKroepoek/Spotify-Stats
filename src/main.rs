@@ -111,9 +111,9 @@ where
 {
     if let Some(path) = file {
         let mut handle = File::create(path)?;
-        writeln!(handle, "{:?}", output)?;
+        writeln!(handle, "{output:?}")?;
     } else {
-        println!("{:?}", output)
+        println!("{output:?}")
     }
     Ok(())
 }
@@ -125,9 +125,9 @@ where
 {
     if let Some(path) = file {
         let mut handle = File::create(path)?;
-        writeln!(handle, "{}", output)?;
+        writeln!(handle, "{output}")?;
     } else {
-        println!("{}", output)
+        println!("{output}")
     }
     Ok(())
 }
@@ -143,20 +143,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         Ok(streaming_data) => streaming_data,
         Err(err) => match args.data {
             Some(path) => {
-                let raw_streaming_data = match RawStreamingData::from_folder_of_json(&path) {
-                    Ok(raw_streaming_data) => raw_streaming_data,
-                    Err(err) => {
-                        panic!("`spotify_stats.bin` is corrupted, exited with this error: {err}")
-                    }
-                };
+                let raw_streaming_data = RawStreamingData::from_folder_of_json(path)?;
                 let streaming_data = FoldedStreamingData::from(raw_streaming_data);
                 streaming_data.save_to_file(JSON_DATA_PATH)?;
                 streaming_data
             }
             None => {
                 panic!(
-                    "the '--data <DATA>' argument was not provided, which is required on first run, exited with this error: {}",
-                    err
+                    "the '--data <DATA>' argument was not provided, which is required on first run, exited with this error: {err}"
                 );
             }
         },

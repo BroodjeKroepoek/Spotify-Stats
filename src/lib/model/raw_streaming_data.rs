@@ -4,6 +4,7 @@
 
 use std::{
     error::Error,
+    fmt::Display,
     fs::{self, read_dir},
     path::Path,
 };
@@ -183,6 +184,25 @@ pub struct SpotifyEntry {
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
 pub struct RawStreamingData(pub Vec<SpotifyEntry>);
 
+#[derive(Debug)]
+pub enum InitializationError {
+    DeserializationError(serde_json::Error),
+    IOError(std::io::Error),
+}
+
+impl Display for InitializationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            InitializationError::DeserializationError(err) => {
+                write!(f, "deserialization error: {err}")
+            }
+            InitializationError::IOError(err) => write!(f, "io error: {err}"),
+        }
+    }
+}
+
+impl Error for InitializationError {}
+
 impl RawStreamingData {
     /// Create a `RawStreamingData` object from a folder containing JSON files.
     ///
@@ -219,14 +239,16 @@ impl RawStreamingData {
     ///     }
     /// }
     /// ```
-    pub fn from_folder_of_json<P>(path: P) -> Result<RawStreamingData, Box<dyn Error>>
+    pub fn from_folder_of_json<P>(path: P) -> Result<RawStreamingData, InitializationError>
     where
         P: AsRef<Path>,
     {
         let mut accumulator = RawStreamingData(Vec::new());
-        for file in read_dir(path)? {
-            let content = fs::read_to_string(file?.path())?;
-            let entries: RawStreamingData = serde_json::from_str(&content)?;
+        for file in read_dir(path).map_err(InitializationError::IOError)? {
+            let content = fs::read_to_string(file.map_err(InitializationError::IOError)?.path())
+                .map_err(InitializationError::IOError)?;
+            let entries: RawStreamingData = serde_json::from_str(&content)
+                .map_err(InitializationError::DeserializationError)?;
             accumulator.0.extend(entries.0);
         }
         Ok(accumulator)
