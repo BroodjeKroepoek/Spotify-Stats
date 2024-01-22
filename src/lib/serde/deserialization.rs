@@ -1,7 +1,7 @@
 //! This module describes the deserialization process, i.e. loading from persistent files.
 
 use chrono::{Duration, NaiveDateTime};
-
+use eyre::Result;
 use serde::{de, Deserialize};
 
 pub fn naive_date_time_deserialization<'de, D>(deserializer: D) -> Result<NaiveDateTime, D::Error>
@@ -19,6 +19,7 @@ pub fn duration_deserialization<'de, D>(deserializer: D) -> Result<Duration, D::
 where
     D: de::Deserializer<'de>,
 {
-    let s: i64 = Deserialize::deserialize(deserializer)?;
-    Ok(Duration::milliseconds(s))
+    Ok(Duration::milliseconds(Deserialize::deserialize(
+        deserializer,
+    )?))
 }

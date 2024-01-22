@@ -1,6 +1,7 @@
 //! This module describes the serialization process, i.e. saving to persistent files.
 
 use chrono::{Duration, NaiveDateTime};
+use eyre::Result;
 use serde::{Serialize, Serializer};
 
 pub fn duration_serialization<S>(duration: &Duration, serializer: S) -> Result<S::Ok, S::Error>

@@ -4,39 +4,36 @@
 pub mod tests;
 
 use std::{
-    error::Error,
     fmt::{Debug, Display},
     fs::File,
     io::Write,
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 use clap::{command, Parser, Subcommand};
-use comfy_table::{presets::ASCII_MARKDOWN, Table};
 
-use spotify_stats::{
-    iterate_nested_map,
-    model::{
-        raw_streaming_data::RawStreamingData,
-        streaming_data::{CleanedStreamingData, FoldedStreamingData},
-        Persist,
-    },
-};
+use comfy_table::{presets::ASCII_MARKDOWN, Table};
+use eyre::Result;
+use spotify_stats::model::compression::EndStreamKindCompressedLogContainer;
 
 #[derive(Debug, Clone, Subcommand)]
-enum Mode {
+enum RawFormat {
     /// Displays the debug formatting of the internal data used by this executable.
     Rust,
     /// Displays the internal data used by this executable in JSON format.
     Json,
     /// Displays the internal data used in raw binary format.
-    Binary,
+    Bin {
+        /// Apply compression
+        #[arg(short, long)]
+        compression: bool,
+    },
 }
 
 #[derive(Debug, Clone, Subcommand)]
 enum Format {
     /// Only the top most played, or when passing the `reversed` flag the top least played.
-    Sorted {
+    Sort {
         /// Display the `top <COUNT>` entries.
         #[arg(short, long)]
         count: Option<usize>,
@@ -45,11 +42,11 @@ enum Format {
         reversed: bool,
     },
     /// Don't sort use default lexicographical ordering.
-    Lexico,
+    Lex,
 }
 
 #[derive(Debug, Clone, Subcommand)]
-enum MyCliCommand {
+enum SpotifyStatsCommand {
     /// Display the streaming data using a pretty and readable format in a table.
     ///
     /// It's possible to only show entries that match your search query, i.e. by specific `artist`, `album` or `track` name.
@@ -83,7 +80,7 @@ enum MyCliCommand {
         file: Option<PathBuf>,
         /// Which raw mode to use: `Rust` or `JSON`.
         #[command(subcommand)]
-        mode: Mode,
+        mode: RawFormat,
     },
 }
 
@@ -92,7 +89,7 @@ enum MyCliCommand {
 /// In the commands section you'll find the different formatting options.
 #[derive(Parser, Debug)]
 #[clap(version, author)]
-struct MyCLI {
+struct SpotifyStats {
     /// FIRST RUN: The folder to extract the streaming data from.
     ///
     /// After first run: a persistent binary file `.\spotify_stats.bin` is created, relative to this executable, that contains all the relevant data compressed.
@@ -101,12 +98,12 @@ struct MyCLI {
     data: Option<PathBuf>,
     /// The format to use when presenting the results to the user.
     #[command(subcommand)]
-    command: MyCliCommand,
+    command: SpotifyStatsCommand,
 }
 
-#[inline(always)]
-fn deligate_output_debug<T>(file: Option<PathBuf>, output: T) -> Result<(), Box<dyn Error>>
+fn deligate_output_debug<P, T>(file: Option<P>, output: &T) -> Result<()>
 where
+    P: AsRef<Path>,
     T: Debug,
 {
     if let Some(path) = file {
@@ -118,9 +115,23 @@ where
     Ok(())
 }
 
-#[inline(always)]
-fn deligate_output_display<T>(file: Option<PathBuf>, output: T) -> Result<(), Box<dyn Error>>
+fn deligate_output_debug_pretty<P, T>(file: Option<P>, output: &T) -> Result<()>
 where
+    P: AsRef<Path>,
+    T: Debug,
+{
+    if let Some(path) = file {
+        let mut handle = File::create(path)?;
+        writeln!(handle, "{output:#?}")?;
+    } else {
+        println!("{output:#?}")
+    }
+    Ok(())
+}
+
+fn deligate_output_display<P, T>(file: Option<P>, output: &T) -> Result<()>
+where
+    P: AsRef<Path>,
     T: Display,
 {
     if let Some(path) = file {
@@ -132,98 +143,68 @@ where
     Ok(())
 }
 
-const JSON_DATA_PATH: &str = "spotify_stats.bin";
+pub const INITIAL_VEC_CAP: usize = 128;
 
-fn main() -> Result<(), Box<dyn Error>> {
-    // Step 1: Parse command line.
-    let args = MyCLI::parse();
+pub const BIN_PATH: &str = "spotify_stats.bin";
 
-    // Step 2: Always open the persistent storage.
-    let streaming_data = match FoldedStreamingData::load_from_file(JSON_DATA_PATH) {
-        Ok(streaming_data) => streaming_data,
-        Err(err) => match args.data {
-            Some(path) => {
-                let raw_streaming_data = RawStreamingData::from_folder_of_json(path)?;
-                let streaming_data = FoldedStreamingData::from(raw_streaming_data);
-                streaming_data.save_to_file(JSON_DATA_PATH)?;
-                streaming_data
-            }
-            None => {
-                panic!(
-                    "the '--data <DATA>' argument was not provided, which is required on first run, exited with this error: {err}"
-                );
-            }
-        },
-    };
-
-    // Step 3: Match on parsed command line arguments and subcommands.
+fn main() -> Result<()> {
+    let args = SpotifyStats::parse();
     match args.command {
-        MyCliCommand::Raw { file, mode } => match mode {
-            Mode::Rust => deligate_output_debug(file, streaming_data)?,
-            Mode::Json => {
-                let string = serde_json::to_string(&streaming_data)?;
-                deligate_output_display(file, string)?;
+        SpotifyStatsCommand::Raw { file, mode } => match mode {
+            RawFormat::Rust => deligate_output_debug_pretty(file, &streaming_data)?,
+            RawFormat::Json => {
+                deligate_output_display(file, &serde_json::to_string(&streaming_data)?)?
             }
-            Mode::Binary => {
-                let bytes = streaming_data.to_bytes()?;
-                deligate_output_debug(file, bytes)?;
+            RawFormat::Bin { compression } => {
+                let bytes = streaming_data.to_bytes(compression)?;
+                deligate_output_display(file, &bytes.escape_ascii())?;
             }
         },
-        MyCliCommand::Table {
+        SpotifyStatsCommand::Table {
             file,
             format,
-            artist,
-            album,
-            track,
+            artist: _,
+            album: _,
+            track: _,
         } => {
             let mut table = Table::new();
             table.load_preset(ASCII_MARKDOWN);
             match format {
-                Format::Sorted { count, reversed } => {
+                Format::Sort { count, reversed } => {
                     let mut counter = 1;
-                    let mut cleaned_entries = CleanedStreamingData::from(streaming_data);
-                    if !reversed {
+                    let mut cleaned_entries =
+                        EndStreamKindCompressedLogContainer::from(streaming_data);
+                    if reversed {
                         cleaned_entries
                             .0
-                            .sort_by(|a, b| a.total_ms_played.cmp(&b.total_ms_played).reverse());
+                            .sort_by(|a, b| a.total_ms_played.cmp(&b.total_ms_played))
                     } else {
                         cleaned_entries
                             .0
-                            .sort_by(|a, b| a.total_ms_played.cmp(&b.total_ms_played));
-                    }
+                            .sort_by(|a, b| a.total_ms_played.cmp(&b.total_ms_played).reverse())
+                    };
                     table.set_header(["Rank", "Artist", "Album", "Track", "Duration (ms)"]);
-                    for cleaned_entry in cleaned_entries.0 {
-                        if (Some(&cleaned_entry.artist) == artist.as_ref()
-                            || Some(&cleaned_entry.album) == album.as_ref()
-                            || Some(&cleaned_entry.track) == track.as_ref())
-                            ^ (artist.is_none() && album.is_none() && track.is_none())
-                            && (counter <= count.unwrap_or_default() || count.is_none())
-                        {
-                            table.add_row([
-                                counter.to_string(),
-                                cleaned_entry.artist,
-                                cleaned_entry.album,
-                                cleaned_entry.track,
-                                cleaned_entry.total_ms_played.num_milliseconds().to_string(),
-                            ]);
-                            counter += 1;
-                        }
+                    for cleaned_entry in cleaned_entries
+                        .0
+                        .iter()
+                        .take(count.unwrap_or(cleaned_entries.0.len()))
+                    {
+                        table.add_row([
+                            counter.to_string(),
+                            cleaned_entry.artist_or_podcast.clone(),
+                            cleaned_entry.album_or_show.clone(),
+                            cleaned_entry.track_or_episode.clone(),
+                            cleaned_entry.total_ms_played.num_milliseconds().to_string(),
+                        ]);
+                        counter += 1;
                     }
                 }
-                Format::Lexico => {
+                Format::Lex => {
                     table.set_header(["Artist", "Album", "Track", "Duration (ms)"]);
-                    iterate_nested_map!(streaming_data, artist, album, track, info, {
-                        let total_ms_played = info.1;
-                        table.add_row([
-                            artist,
-                            album,
-                            track,
-                            &total_ms_played.num_milliseconds().to_string(),
-                        ]);
-                    });
+                    todo!()
                 }
             };
-            deligate_output_display(file, table)?;
+            deligate_output_display(file, &table)?;
         }
     }
     Ok(())
