@@ -21,7 +21,6 @@ use super::end_stream::{
 /// Represents a log entry for a streaming event, including play duration and reasons.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
 pub struct EndStreamLogEntry {
-    pub platform: String,
     /// Duration of the music track played.
     #[serde(
         deserialize_with = "duration_deserialization",
@@ -135,17 +134,28 @@ pub struct AssocInfo {
 #[repr(transparent)]
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
 pub struct CompressedEndStreamWithKindContainer(
-    // TODO: maybe add `platform` and `spotify_track_uri` and `spotify_episode_uri` (but this is none often) to the keys for increased searchability and compression
-    /// A BTreeMap with nested structures representing artist,  album, track,   and track info...
-    ///                                                podcast, show,  episode, and episode info...
-    ///                                                ?,       ?,     ?,       and video info...
     pub  BTreeMap<
-        String,
+        String, // username
         BTreeMap<
-            String,
+            String, // conn_country
             BTreeMap<
-                EndStreamKind,
-                BTreeMap<String, BTreeMap<String, BTreeMap<String, AssocInfo>>>,
+                String,
+                // platform (maybe remove, because has structure that is easily compressable, for example:
+                // `Android OS 4.1.2 API 16 (samsung, GT-I8260)`
+                // `Android OS 9 API 28 (samsung, SM-G950F)`
+                BTreeMap<
+                    EndStreamKind,
+                    BTreeMap<
+                        String, // artist
+                        BTreeMap<
+                            String, // album
+                            BTreeMap<
+                                String, // track
+                                AssocInfo,
+                            >,
+                        >,
+                    >,
+                >,
             >,
         >,
     >,
@@ -160,6 +170,7 @@ impl CompressedEndStreamWithKindContainer {
         &mut self,
         username: String,
         conn_country: String,
+        platform: String,
         kind: EndStreamKind,
         artist: String,
         album: String,
@@ -170,6 +181,8 @@ impl CompressedEndStreamWithKindContainer {
             .entry(username)
             .or_default()
             .entry(conn_country)
+            .or_default()
+            .entry(platform)
             .or_default()
             .entry(kind)
             .or_default()
@@ -216,6 +229,7 @@ impl From<EndStreamWithKindContainer> for CompressedEndStreamWithKindContainer {
                 out.insert(
                     x.end_stream.username,
                     x.end_stream.conn_country,
+                    x.end_stream.platform,
                     x.kind,
                     key1.clone(),
                     key2.clone(),
@@ -232,6 +246,7 @@ impl IntoIterator for CompressedEndStreamWithKindContainer {
     type Item = (
         String,
         String,
+        String,
         EndStreamKind,
         String,
         String,
@@ -240,6 +255,7 @@ impl IntoIterator for CompressedEndStreamWithKindContainer {
     );
 
     type IntoIter = <Vec<(
+        String,
         String,
         String,
         EndStreamKind,
@@ -251,21 +267,24 @@ impl IntoIterator for CompressedEndStreamWithKindContainer {
 
     fn into_iter(self) -> Self::IntoIter {
         let mut acc = Vec::with_capacity(INITIAL_VEC_CAP);
-        for u in self.0 {
-            for v in u.1 {
-                for w in v.1 {
-                    for x in w.1 {
-                        for y in x.1 {
-                            for z in y.1 {
-                                acc.push((
-                                    u.0.clone(),
-                                    v.0.clone(),
-                                    w.0.clone(),
-                                    x.0.clone(),
-                                    y.0.clone(),
-                                    z.0,
-                                    z.1,
-                                ));
+        for t in self.0 {
+            for u in t.1 {
+                for v in u.1 {
+                    for w in v.1 {
+                        for x in w.1 {
+                            for y in x.1 {
+                                for z in y.1 {
+                                    acc.push((
+                                        t.0.clone(),
+                                        u.0.clone(),
+                                        v.0.clone(),
+                                        w.0.clone(),
+                                        x.0.clone(),
+                                        y.0.clone(),
+                                        z.0,
+                                        z.1,
+                                    ));
+                                }
                             }
                         }
                     }
@@ -280,6 +299,7 @@ impl
     FromIterator<(
         String,
         String,
+        String,
         EndStreamKind,
         String,
         String,
@@ -290,6 +310,7 @@ impl
     fn from_iter<
         T: IntoIterator<
             Item = (
+                String,
                 String,
                 String,
                 EndStreamKind,
@@ -303,8 +324,17 @@ impl
         iter: T,
     ) -> Self {
         let mut out = CompressedEndStreamWithKindContainer::new();
-        for (username, conn_country, kind, artist, album, track, info) in iter {
-            out.insert(username, conn_country, kind, artist, album, track, info);
+        for (username, conn_country, platform, kind, artist, album, track, info) in iter {
+            out.insert(
+                username,
+                conn_country,
+                platform,
+                kind,
+                artist,
+                album,
+                track,
+                info,
+            );
         }
         out
     }
@@ -373,7 +403,6 @@ impl From<&EndStreamWithKind> for EndStreamLog {
 impl From<&EndStreamWithKind> for EndStreamLogEntry {
     fn from(value: &EndStreamWithKind) -> Self {
         EndStreamLogEntry {
-            platform: value.end_stream.platform.clone(),
             ms_played: value.end_stream.ms_played,
             reason_start: value.end_stream.reason_start.clone(),
             reason_end: value.end_stream.reason_end.clone(),
