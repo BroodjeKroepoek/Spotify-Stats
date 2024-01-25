@@ -23,9 +23,17 @@ use spotify_stats::model::{
 #[derive(Debug, Clone, Subcommand)]
 enum RawFormat {
     /// Displays the debug formatting of the internal data used by this executable.
-    Rust,
+    Rust {
+        /// Pretty formatting
+        #[arg(short, long)]
+        pretty: bool,
+    },
     /// Displays the internal data used by this executable in JSON format.
-    Json,
+    Json {
+        /// Pretty formatting
+        #[arg(short, long)]
+        pretty: bool,
+    },
     /// Displays the internal data used in raw binary format.
     Bin {
         /// Apply compression
@@ -105,30 +113,22 @@ struct SpotifyStats {
     command: SpotifyStatsCommand,
 }
 
-fn deligate_output_debug<P, T>(file: Option<P>, output: &T) -> Result<()>
+fn deligate_output_debug<P, T>(file: Option<P>, output: &T, pretty: bool) -> Result<()>
 where
     P: AsRef<Path>,
     T: Debug,
 {
     if let Some(path) = file {
         let mut handle = File::create(path)?;
-        writeln!(handle, "{output:?}")?;
+        if pretty {
+            writeln!(handle, "{output:#?}")?;
+        } else {
+            writeln!(handle, "{output:?}")?;
+        }
+    } else if pretty {
+        println!("{output:#?}");
     } else {
-        println!("{output:?}")
-    }
-    Ok(())
-}
-
-fn deligate_output_debug_pretty<P, T>(file: Option<P>, output: &T) -> Result<()>
-where
-    P: AsRef<Path>,
-    T: Debug,
-{
-    if let Some(path) = file {
-        let mut handle = File::create(path)?;
-        writeln!(handle, "{output:#?}")?;
-    } else {
-        println!("{output:#?}")
+        println!("{output:?}");
     }
     Ok(())
 }
@@ -158,7 +158,7 @@ fn init_data(
             CompressedEndStreamWithKindContainer::from_folder_of_json(path)?
         }
     } else {
-        panic!("TODO")
+        panic!("Provide `--data <FOLDER>` to init data from")
     };
     streaming_data.save_to_file(BIN_PATH, compress)?;
     Ok(streaming_data)
@@ -173,9 +173,13 @@ fn main() -> Result<()> {
     let streaming_data = init_data(args.data, true)?;
     match args.command {
         SpotifyStatsCommand::Raw { file, mode } => match mode {
-            RawFormat::Rust => deligate_output_debug_pretty(file, &streaming_data)?,
-            RawFormat::Json => {
-                deligate_output_display(file, &serde_json::to_string(&streaming_data)?)?
+            RawFormat::Rust { pretty } => deligate_output_debug(file, &streaming_data, pretty)?,
+            RawFormat::Json { pretty } => {
+                if pretty {
+                    deligate_output_display(file, &serde_json::to_string_pretty(&streaming_data)?)?
+                } else {
+                    deligate_output_display(file, &serde_json::to_string(&streaming_data)?)?
+                }
             }
             RawFormat::Bin { compression } => {
                 let bytes = streaming_data.to_bytes(compression)?;
