@@ -1,1 +1,4 @@
 /target
+/.vscode
+spotify_stats.bin
+*.pdf

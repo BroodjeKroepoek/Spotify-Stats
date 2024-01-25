@@ -174,6 +174,24 @@ pub struct EndStreamWithKind {
     pub end_stream: EndStream,
 }
 
+impl From<EndStream> for EndStreamWithKind {
+    fn from(value: EndStream) -> Self {
+        let x = if value.master_metadata_album_artist_name.is_some()
+            && value.master_metadata_album_album_name.is_some()
+        {
+            EndStreamKind::EndSong
+        } else if value.episode_name.is_some() {
+            EndStreamKind::EndEpisode
+        } else {
+            EndStreamKind::EndVideoOrElse
+        };
+        Self {
+            end_stream: value,
+            kind: x,
+        }
+    }
+}
+
 #[repr(transparent)]
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
 pub struct EndStreamWithKindContainer(pub Vec<EndStreamWithKind>);
@@ -210,28 +228,8 @@ impl FromIterator<EndStreamWithKind> for EndStreamWithKindContainer {
     }
 }
 
-// TODO: rewrite this and keep an eye an which field contribute to which kind
-impl From<EndStream> for EndStreamWithKind {
-    fn from(value: EndStream) -> Self {
-        let x = if let (Some(ref _artist), Some(ref _album)) = (
-            &value.master_metadata_album_artist_name,
-            &value.master_metadata_album_album_name,
-        ) {
-            EndStreamKind::EndSong
-        } else if let Some(ref _episode) = value.episode_name {
-            EndStreamKind::EndEpisode
-        } else {
-            EndStreamKind::EndVideoOrElse
-        };
-        Self {
-            end_stream: value,
-            kind: x,
-        }
-    }
-}
-
 impl From<EndStreamContainer> for EndStreamWithKindContainer {
     fn from(value: EndStreamContainer) -> Self {
-        Self(value.into_iter().map(EndStreamWithKind::from).collect())
+        Self::from_iter(value.into_iter().map(EndStreamWithKind::from))
     }
 }

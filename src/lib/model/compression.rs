@@ -14,7 +14,9 @@ use crate::{
     serde::{deserialization::duration_deserialization, serialization::duration_serialization},
 };
 
-use super::end_stream::{EndStream, EndStreamWithKindContainer, FromFolderJson, INITIAL_VEC_CAP};
+use super::end_stream::{
+    EndStreamWithKind, EndStreamWithKindContainer, FromFolderJson, INITIAL_VEC_CAP,
+};
 
 /// Represents a log entry for a streaming event, including play duration and reasons.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
@@ -37,7 +39,6 @@ pub struct EndStreamLogEntry {
     pub user_agent_decrypted: Option<String>,
     pub offline_timestamp: Option<u128>,
     pub incognito_mode: Option<bool>,
-    pub conn_country: String,
 }
 
 /// Represents a log of streaming events indexed by timestamp.
@@ -116,7 +117,6 @@ impl FromIterator<(NaiveDateTime, EndStreamLogEntry)> for EndStreamLog {
 /// ```
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
 pub struct AssocInfo {
-    pub username: String,
     /// Total duration of all music tracks played.
     #[serde(
         deserialize_with = "duration_deserialization",
@@ -135,10 +135,20 @@ pub struct AssocInfo {
 #[repr(transparent)]
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
 pub struct CompressedEndStreamWithKindContainer(
+    // TODO: maybe add `platform` and `spotify_track_uri` and `spotify_episode_uri` (but this is none often) to the keys for increased searchability and compression
     /// A BTreeMap with nested structures representing artist,  album, track,   and track info...
     ///                                                podcast, show,  episode, and episode info...
     ///                                                ?,       ?,     ?,       and video info...
-    pub BTreeMap<EndStreamKind, BTreeMap<String, BTreeMap<String, BTreeMap<String, AssocInfo>>>>,
+    pub  BTreeMap<
+        String,
+        BTreeMap<
+            String,
+            BTreeMap<
+                EndStreamKind,
+                BTreeMap<String, BTreeMap<String, BTreeMap<String, AssocInfo>>>,
+            >,
+        >,
+    >,
 );
 
 impl CompressedEndStreamWithKindContainer {
@@ -148,6 +158,8 @@ impl CompressedEndStreamWithKindContainer {
 
     fn insert(
         &mut self,
+        username: String,
+        conn_country: String,
         kind: EndStreamKind,
         artist: String,
         album: String,
@@ -155,6 +167,10 @@ impl CompressedEndStreamWithKindContainer {
         info: AssocInfo,
     ) {
         self.0
+            .entry(username)
+            .or_default()
+            .entry(conn_country)
+            .or_default()
             .entry(kind)
             .or_default()
             .entry(artist)
@@ -181,31 +197,77 @@ impl FromFolderJson for CompressedEndStreamWithKindContainer {
 // TODO: this is an important function!
 impl From<EndStreamWithKindContainer> for CompressedEndStreamWithKindContainer {
     fn from(value: EndStreamWithKindContainer) -> Self {
-        let _out = Self::new();
+        let mut out = Self::new();
         for x in value {
-            let _label = match x.kind {
-                EndStreamKind::EndSong => "music",
-                EndStreamKind::EndEpisode => "podcast",
-                EndStreamKind::EndVideoOrElse => "video/other",
+            let (key1, key2, key3) = match x.kind {
+                EndStreamKind::EndSong | EndStreamKind::EndVideoOrElse => (
+                    &x.end_stream.master_metadata_album_artist_name,
+                    &x.end_stream.master_metadata_album_album_name,
+                    &x.end_stream.master_metadata_track_name,
+                ),
+                EndStreamKind::EndEpisode => (
+                    &x.end_stream.master_metadata_album_artist_name,
+                    &x.end_stream.episode_show_name,
+                    &x.end_stream.episode_name,
+                ),
             };
+            let info = AssocInfo::from(&x);
+            if let (Some(key1), Some(key2), Some(key3)) = (key1, key2, key3) {
+                out.insert(
+                    x.end_stream.username,
+                    x.end_stream.conn_country,
+                    x.kind,
+                    key1.clone(),
+                    key2.clone(),
+                    key3.clone(),
+                    info,
+                )
+            }
         }
-        todo!()
+        out
     }
 }
 
 impl IntoIterator for CompressedEndStreamWithKindContainer {
-    type Item = (EndStreamKind, String, String, String, AssocInfo);
+    type Item = (
+        String,
+        String,
+        EndStreamKind,
+        String,
+        String,
+        String,
+        AssocInfo,
+    );
 
-    type IntoIter =
-        <Vec<(EndStreamKind, String, String, String, AssocInfo)> as IntoIterator>::IntoIter;
+    type IntoIter = <Vec<(
+        String,
+        String,
+        EndStreamKind,
+        String,
+        String,
+        String,
+        AssocInfo,
+    )> as IntoIterator>::IntoIter;
 
     fn into_iter(self) -> Self::IntoIter {
         let mut acc = Vec::with_capacity(INITIAL_VEC_CAP);
-        for w in self.0 {
-            for x in w.1 {
-                for y in x.1 {
-                    for z in y.1 {
-                        acc.push((w.0.clone(), x.0.clone(), y.0.clone(), z.0, z.1));
+        for u in self.0 {
+            for v in u.1 {
+                for w in v.1 {
+                    for x in w.1 {
+                        for y in x.1 {
+                            for z in y.1 {
+                                acc.push((
+                                    u.0.clone(),
+                                    v.0.clone(),
+                                    w.0.clone(),
+                                    x.0.clone(),
+                                    y.0.clone(),
+                                    z.0,
+                                    z.1,
+                                ));
+                            }
+                        }
                     }
                 }
             }
@@ -214,15 +276,35 @@ impl IntoIterator for CompressedEndStreamWithKindContainer {
     }
 }
 
-impl FromIterator<(EndStreamKind, String, String, String, AssocInfo)>
-    for CompressedEndStreamWithKindContainer
+impl
+    FromIterator<(
+        String,
+        String,
+        EndStreamKind,
+        String,
+        String,
+        String,
+        AssocInfo,
+    )> for CompressedEndStreamWithKindContainer
 {
-    fn from_iter<T: IntoIterator<Item = (EndStreamKind, String, String, String, AssocInfo)>>(
+    fn from_iter<
+        T: IntoIterator<
+            Item = (
+                String,
+                String,
+                EndStreamKind,
+                String,
+                String,
+                String,
+                AssocInfo,
+            ),
+        >,
+    >(
         iter: T,
     ) -> Self {
         let mut out = CompressedEndStreamWithKindContainer::new();
-        for (kind, artist, album, track, info) in iter {
-            out.insert(kind, artist, album, track, info);
+        for (username, conn_country, kind, artist, album, track, info) in iter {
+            out.insert(username, conn_country, kind, artist, album, track, info);
         }
         out
     }
@@ -282,39 +364,37 @@ impl FromIterator<(String, String, String, AssocInfo)> for CompressedEndStreamCo
     }
 }
 
-impl From<&EndStream> for EndStreamLog {
-    fn from(value: &EndStream) -> Self {
-        Self::bind(value.ts, EndStreamLogEntry::from(value))
+impl From<&EndStreamWithKind> for EndStreamLog {
+    fn from(value: &EndStreamWithKind) -> Self {
+        Self::bind(value.end_stream.ts, EndStreamLogEntry::from(value))
     }
 }
 
-impl From<&EndStream> for EndStreamLogEntry {
-    fn from(value: &EndStream) -> Self {
+impl From<&EndStreamWithKind> for EndStreamLogEntry {
+    fn from(value: &EndStreamWithKind) -> Self {
         EndStreamLogEntry {
-            platform: value.platform.clone(),
-            ms_played: value.ms_played,
-            reason_start: value.reason_start.clone(),
-            reason_end: value.reason_end.clone(),
-            shuffle: value.shuffle,
-            skipped: value.skipped,
-            offline: value.offline,
-            ip_addr_decrypted: value.ip_addr_decrypted,
-            user_agent_decrypted: value.user_agent_decrypted.clone(),
-            offline_timestamp: value.offline_timestamp,
-            incognito_mode: value.incognito_mode,
-            conn_country: value.conn_country.clone(),
+            platform: value.end_stream.platform.clone(),
+            ms_played: value.end_stream.ms_played,
+            reason_start: value.end_stream.reason_start.clone(),
+            reason_end: value.end_stream.reason_end.clone(),
+            shuffle: value.end_stream.shuffle,
+            skipped: value.end_stream.skipped,
+            offline: value.end_stream.offline,
+            ip_addr_decrypted: value.end_stream.ip_addr_decrypted,
+            user_agent_decrypted: value.end_stream.user_agent_decrypted.clone(),
+            offline_timestamp: value.end_stream.offline_timestamp,
+            incognito_mode: value.end_stream.incognito_mode,
         }
     }
 }
 
 /// Convert a `SpotifyEntry` into `Information`.
-impl From<&EndStream> for AssocInfo {
-    fn from(value: &EndStream) -> Self {
+impl From<&EndStreamWithKind> for AssocInfo {
+    fn from(value: &EndStreamWithKind) -> Self {
         AssocInfo {
-            username: value.username.clone(),
-            total_ms_played: value.ms_played,
-            spotify_track_uri: value.spotify_track_uri.clone(),
-            spotify_episode_uri: value.spotify_episode_uri.clone(),
+            total_ms_played: value.end_stream.ms_played,
+            spotify_track_uri: value.end_stream.spotify_track_uri.clone(),
+            spotify_episode_uri: value.end_stream.spotify_episode_uri.clone(),
             end_stream_log: EndStreamLog::from(value),
         }
     }
@@ -358,7 +438,7 @@ pub struct EndStreamKindCompressedLogContainer(
 /// Convert `FoldedStreamingData` into `CleanedStreamingData`.
 impl From<CompressedEndStreamWithKindContainer> for EndStreamKindCompressedLogContainer {
     fn from(value: CompressedEndStreamWithKindContainer) -> Self {
-        for (_a, _b, _c, _d, _e) in value {
+        for _x in value {
             todo!()
         }
         todo!()

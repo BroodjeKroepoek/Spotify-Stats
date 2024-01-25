@@ -13,8 +13,12 @@ use std::{
 use clap::{command, Parser, Subcommand};
 
 use comfy_table::{presets::ASCII_MARKDOWN, Table};
-use eyre::Result;
-use spotify_stats::model::compression::EndStreamKindCompressedLogContainer;
+use eyre::{Ok, Result};
+use spotify_stats::model::{
+    compression::{CompressedEndStreamWithKindContainer, EndStreamKindCompressedLogContainer},
+    end_stream::FromFolderJson,
+    Persist,
+};
 
 #[derive(Debug, Clone, Subcommand)]
 enum RawFormat {
@@ -143,12 +147,30 @@ where
     Ok(())
 }
 
+fn init_data(
+    data_path: Option<PathBuf>,
+    compress: bool,
+) -> Result<CompressedEndStreamWithKindContainer> {
+    let streaming_data = if let Some(path) = data_path {
+        if let Result::Ok(data) = CompressedEndStreamWithKindContainer::load_from_file(BIN_PATH) {
+            Ok(data)?
+        } else {
+            CompressedEndStreamWithKindContainer::from_folder_of_json(path)?
+        }
+    } else {
+        panic!("TODO")
+    };
+    streaming_data.save_to_file(BIN_PATH, compress)?;
+    Ok(streaming_data)
+}
+
 pub const INITIAL_VEC_CAP: usize = 128;
 
 pub const BIN_PATH: &str = "spotify_stats.bin";
 
 fn main() -> Result<()> {
     let args = SpotifyStats::parse();
+    let streaming_data = init_data(args.data, true)?;
     match args.command {
         SpotifyStatsCommand::Raw { file, mode } => match mode {
             RawFormat::Rust => deligate_output_debug_pretty(file, &streaming_data)?,
